@@ -1,0 +1,5 @@
+{
+  "name": "MNNIT Campus Navigation Simulator",
+  "description": "A high-fidelity 3D navigation simulator built for research and thesis evaluation, featuring building detection, path metrics, and guidance systems.",
+  "requestFramePermissions": []
+}
