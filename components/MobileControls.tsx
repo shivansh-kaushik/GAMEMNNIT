@@ -72,13 +72,26 @@ const MobileControls: React.FC<MobileControlsProps> = ({ onMove, onLook, onVerti
     };
 
     return (
-        <div className="absolute inset-0 pointer-events-none z-50 flex flex-col justify-end pb-20 px-8">
+        <div className="absolute inset-0 pointer-events-none z-50 flex flex-col justify-end pb-8 px-6 md:pb-12 md:px-12">
+
+            {/* INVISIBLE FULL SCREEN LOOK AREA (Right Half) */}
+            <div
+                className="absolute top-0 right-0 w-1/2 h-full touch-none pointer-events-auto z-40"
+                onTouchStart={(e) => {
+                    const touch = e.touches[0];
+                    lastLookTouch.current = { x: touch.clientX, y: touch.clientY };
+                }}
+                onTouchMove={handleLookMove}
+                onTouchEnd={handleLookEnd}
+            />
+
             {/* Visual Instruction */}
-            <div className="absolute top-20 left-1/2 -translate-x-1/2 text-[10px] text-white/30 font-mono uppercase tracking-widest pointer-events-none">
-                Mobile Interface Active
+            <div className="absolute top-24 left-1/2 -translate-x-1/2 text-[10px] text-white/30 font-mono uppercase tracking-widest pointer-events-none text-center">
+                Mobile Interface Active<br />
+                <span className="text-[8px] opacity-50">Left Stick to Move • Right Side to Look</span>
             </div>
 
-            <div className="flex justify-between items-end w-full pointer-events-auto">
+            <div className="flex justify-between items-end w-full pointer-events-auto z-50">
                 {/* Left: Joystick */}
                 <div
                     className="relative w-32 h-32 bg-slate-900/50 rounded-full border border-slate-600/50 backdrop-blur-sm touch-none"
@@ -96,35 +109,26 @@ const MobileControls: React.FC<MobileControlsProps> = ({ onMove, onLook, onVerti
                     />
                 </div>
 
-                {/* Right: Buttons & Touch Look Area */}
+                {/* Right: Buttons */}
                 <div className="flex flex-col gap-4 items-center touch-none">
-                    {/* Look Area (Invisible overlay on right half of screen ideally, but here just a pad) */}
-                    <div
-                        className="w-40 h-32 bg-slate-900/20 border border-white/10 rounded-xl mb-4 flex items-center justify-center"
-                        onTouchMove={handleLookMove}
-                        onTouchEnd={handleLookEnd}
-                    >
-                        <span className="text-[9px] text-white/20 uppercase font-black">Touch & Drag to Look</span>
-                    </div>
-
                     <div className="flex gap-4">
                         <button
-                            className="w-16 h-16 bg-slate-800/80 rounded-full border border-slate-600 flex items-center justify-center active:bg-blue-600 active:scale-95 transition-all"
+                            className="w-16 h-16 bg-slate-800/80 rounded-full border border-slate-600 flex items-center justify-center active:bg-blue-600 active:scale-95 transition-all shadow-lg"
                             onTouchStart={() => onVertical(-1)}
                             onTouchEnd={() => onVertical(0)}
                             onMouseDown={() => onVertical(-1)}
                             onMouseUp={() => onVertical(0)}
                         >
-                            <ArrowDown className="w-6 h-6 text-white" />
+                            <ArrowDown className="w-8 h-8 text-white" />
                         </button>
                         <button
-                            className="w-16 h-16 bg-slate-800/80 rounded-full border border-slate-600 flex items-center justify-center active:bg-blue-600 active:scale-95 transition-all"
+                            className="w-16 h-16 bg-slate-800/80 rounded-full border border-slate-600 flex items-center justify-center active:bg-blue-600 active:scale-95 transition-all shadow-lg"
                             onTouchStart={() => onVertical(1)}
                             onTouchEnd={() => onVertical(0)}
                             onMouseDown={() => onVertical(1)}
                             onMouseUp={() => onVertical(0)}
                         >
-                            <ArrowUp className="w-6 h-6 text-white" />
+                            <ArrowUp className="w-8 h-8 text-white" />
                         </button>
                     </div>
                 </div>

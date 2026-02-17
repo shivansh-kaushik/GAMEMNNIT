@@ -198,34 +198,45 @@ const App: React.FC = () => {
         {/* <ContactShadows resolution={1024} scale={150} blur={2.5} opacity={0.6} far={20} color="#000000" /> */}
       </Canvas>
 
-      <div className="absolute inset-0 pointer-events-none flex flex-col justify-between p-6 overflow-hidden">
+      <div className="absolute inset-0 pointer-events-none flex flex-col justify-between p-2 md:p-6 overflow-hidden">
         {/* Top Header */}
         <div className="flex justify-between items-start pointer-events-auto">
-          <div className="bg-slate-900/95 backdrop-blur-xl border border-slate-700/50 p-5 rounded-2xl shadow-2xl border-l-4 border-l-blue-500">
-            <h1 className="text-xl font-black flex items-center gap-3 tracking-tight text-white uppercase">
-              <Navigation2 className="text-blue-500 w-6 h-6 rotate-45" />
-              MNNIT Smart-Nav
+          <div className="bg-slate-900/95 backdrop-blur-xl border border-slate-700/50 p-3 md:p-5 rounded-2xl shadow-2xl border-l-4 border-l-blue-500 max-w-[60%] md:max-w-none">
+            <h1 className="text-sm md:text-xl font-black flex items-center gap-2 md:gap-3 tracking-tight text-white uppercase">
+              <Navigation2 className="text-blue-500 w-4 h-4 md:w-6 md:h-6 rotate-45" />
+              <span className="truncate">MNNIT Smart-Nav</span>
             </h1>
             <div className="flex items-center gap-4 mt-1">
-              <span className="text-slate-500 text-[9px] font-black uppercase tracking-widest flex items-center gap-1">
-                <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></span> System Active
+              <span className="text-slate-500 text-[8px] md:text-[9px] font-black uppercase tracking-widest flex items-center gap-1">
+                <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></span> <span className="hidden md:inline">System Active</span>
               </span>
-              <span className="text-slate-500 text-[9px] font-black uppercase tracking-widest">Thesis v2.4</span>
+              <span className="text-slate-500 text-[8px] md:text-[9px] font-black uppercase tracking-widest">v2.4</span>
             </div>
           </div>
 
-          <div className="flex flex-col gap-3 items-end">
+          <div className="flex flex-col gap-2 md:gap-3 items-end">
             <div className="flex gap-2">
+              {gameStarted && (
+                <button
+                  onClick={resetSimulator}
+                  className="px-3 py-2 rounded-xl border border-red-500/30 bg-red-500/10 hover:bg-red-500/20 text-red-400 backdrop-blur-md transition-all flex items-center gap-2 text-[10px] font-black tracking-widest shadow-lg"
+                >
+                  <RefreshCw className="w-4 h-4" /> <span className="hidden md:inline">RECALIBRATE</span>
+                </button>
+              )}
+
               <button
                 onClick={() => setResearchMode(!researchMode)}
-                className={`px-4 py-2 rounded-xl border transition-all flex items-center gap-2 text-[10px] font-black tracking-widest ${researchMode ? 'bg-blue-600 border-blue-400 text-white shadow-lg shadow-blue-500/20' : 'bg-slate-800 border-slate-700 text-slate-400'}`}
+                className={`px-3 py-2 md:px-4 md:py-2 rounded-xl border transition-all flex items-center gap-2 text-[10px] font-black tracking-widest ${researchMode ? 'bg-blue-600 border-blue-400 text-white shadow-lg shadow-blue-500/20' : 'bg-slate-800 border-slate-700 text-slate-400'}`}
               >
-                <Activity className="w-4 h-4" /> {researchMode ? 'RESEARCH VIEW' : 'USER VIEW'}
+                <Activity className="w-4 h-4" /> <span className="hidden md:inline">{researchMode ? 'RESEARCH VIEW' : 'USER VIEW'}</span>
               </button>
             </div>
 
             {gameStarted && researchMode && (
-              <WifiScanner readings={wifiReadings} detectedFloor={navState.detectedFloor} confidence={navState.fingerprintConfidence} />
+              <div className="hidden md:block">
+                <WifiScanner readings={wifiReadings} detectedFloor={navState.detectedFloor} confidence={navState.fingerprintConfidence} />
+              </div>
             )}
           </div>
         </div>
@@ -233,34 +244,38 @@ const App: React.FC = () => {
         {/* HUD Elements */}
         {gameStarted && !showResults && (
           <>
-            <div className="absolute top-32 left-6 flex flex-col gap-4 pointer-events-auto">
-              <div className="bg-slate-900/90 backdrop-blur-md border border-slate-700/50 p-4 rounded-2xl shadow-xl min-w-[220px]">
-                <div className="text-[9px] uppercase text-slate-500 font-black mb-1 tracking-widest flex items-center gap-1">
-                  <Crosshair className="w-3 h-3" /> Spatial Target
+            <div className="absolute top-20 md:top-32 left-2 md:left-6 flex flex-col gap-2 md:gap-4 pointer-events-auto max-w-[180px] md:max-w-[220px]">
+              <div className="bg-slate-900/90 backdrop-blur-md border border-slate-700/50 p-3 md:p-4 rounded-2xl shadow-xl">
+                <div className="text-[8px] md:text-[9px] uppercase text-slate-500 font-black mb-1 tracking-widest flex items-center gap-1">
+                  <Crosshair className="w-3 h-3" /> Target
                 </div>
-                <div className="text-lg font-black text-white">{targetBuilding?.name}</div>
+                <div className="text-sm md:text-lg font-black text-white leading-tight">{targetBuilding?.name}</div>
 
                 {/* Distance to Target Display */}
                 {distanceToTarget !== null && (
-                  <div className="my-2 p-2 bg-blue-500/10 rounded border border-blue-500/30 flex items-center justify-between">
-                    <span className="text-[9px] font-bold text-blue-400 uppercase">Distance to Target</span>
-                    <span className="text-sm font-mono font-black text-white">{distanceToTarget.toFixed(1)}m</span>
+                  <div className="my-2 p-1.5 md:p-2 bg-blue-500/10 rounded border border-blue-500/30 flex items-center justify-between">
+                    <span className="text-[8px] md:text-[9px] font-bold text-blue-400 uppercase">Dist</span>
+                    <span className="text-xs md:text-sm font-mono font-black text-white">{distanceToTarget.toFixed(1)}m</span>
                   </div>
                 )}
 
-                <div className="mt-3 pt-3 border-t border-slate-800 flex justify-between">
+                <div className="mt-2 md:mt-3 pt-2 md:pt-3 border-t border-slate-800 flex justify-between">
                   <div>
-                    <div className="text-[8px] uppercase text-slate-500 font-bold">Odometer</div>
-                    <div className="text-sm font-mono text-slate-400">{navState.distanceTraveled.toFixed(1)}m</div>
+                    <div className="text-[8px] uppercase text-slate-500 font-bold">Odo</div>
+                    <div className="text-xs md:text-sm font-mono text-slate-400">{navState.distanceTraveled.toFixed(1)}m</div>
                   </div>
                   <div className="text-right">
-                    <div className="text-[8px] uppercase text-slate-500 font-bold">Elapsed</div>
-                    <div className="text-sm font-mono text-green-400">{((Date.now() - (navState.startTime || 0)) / 1000).toFixed(1)}s</div>
+                    <div className="text-[8px] uppercase text-slate-500 font-bold">Time</div>
+                    <div className="text-xs md:text-sm font-mono text-green-400">{((Date.now() - (navState.startTime || 0)) / 1000).toFixed(0)}s</div>
                   </div>
                 </div>
               </div>
 
-              {researchMode && <MiniMap playerPos={playerCoords} buildings={CAMPUS_BUILDINGS} />}
+              {researchMode && (
+                <div className="hidden md:block">
+                  <MiniMap playerPos={playerCoords} buildings={CAMPUS_BUILDINGS} />
+                </div>
+              )}
             </div>
 
             <div className="absolute bottom-28 left-6 pointer-events-auto hidden md:block">
@@ -277,42 +292,35 @@ const App: React.FC = () => {
 
         {/* Footer Mission Selector */}
         <div className="flex justify-center w-full pointer-events-auto">
-          {!gameStarted ? (
-            <div className="bg-slate-900/95 p-8 rounded-3xl border border-slate-700 shadow-[0_0_50px_rgba(0,0,0,0.5)] w-full max-w-5xl">
-              <div className="flex items-center justify-between mb-8">
+          {!gameStarted && (
+            <div className="bg-slate-900/95 p-6 md:p-8 rounded-3xl border border-slate-700 shadow-[0_0_50px_rgba(0,0,0,0.5)] w-full max-w-5xl my-auto">
+              <div className="flex items-center justify-between mb-6 md:mb-8">
                 <div>
-                  <h2 className="text-2xl font-black text-white tracking-tight uppercase">Simulation Environment</h2>
-                  <p className="text-slate-500 text-xs font-medium">Evaluate the hybrid positioning algorithm via designated campus missions.</p>
+                  <h2 className="text-xl md:text-2xl font-black text-white tracking-tight uppercase">Simulation Environment</h2>
+                  <p className="text-slate-500 text-[10px] md:text-xs font-medium">Evaluate the hybrid positioning algorithm via designated campus missions.</p>
                 </div>
-                <div className="w-12 h-12 bg-blue-500/10 rounded-full flex items-center justify-center">
-                  <Radio className="text-blue-500 animate-pulse w-6 h-6" />
+                <div className="w-10 h-10 md:w-12 md:h-12 bg-blue-500/10 rounded-full flex items-center justify-center">
+                  <Radio className="text-blue-500 animate-pulse w-5 h-5 md:w-6 md:h-6" />
                 </div>
               </div>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-5">
                 {MISSIONS.map((m, idx) => (
                   <button
                     key={m.id}
                     onClick={() => startMission(idx)}
-                    className="flex flex-col items-center gap-4 p-6 bg-slate-800/40 hover:bg-blue-900/20 hover:border-blue-500/50 transition-all rounded-2xl border border-slate-700 group relative overflow-hidden"
+                    className="flex flex-col items-center gap-3 md:gap-4 p-4 md:p-6 bg-slate-800/40 hover:bg-blue-900/20 hover:border-blue-500/50 transition-all rounded-2xl border border-slate-700 group relative overflow-hidden"
                   >
                     <div className="absolute top-0 right-0 p-2 opacity-5 group-hover:opacity-10 transition-opacity">
                       <MapPin className="w-12 h-12" />
                     </div>
-                    <div className="w-14 h-14 rounded-2xl bg-slate-800 flex items-center justify-center group-hover:scale-110 group-hover:bg-blue-500 transition-all duration-300">
-                      <MapPin className="w-7 h-7 text-white" />
+                    <div className="w-10 h-10 md:w-14 md:h-14 rounded-2xl bg-slate-800 flex items-center justify-center group-hover:scale-110 group-hover:bg-blue-500 transition-all duration-300">
+                      <MapPin className="w-5 h-5 md:w-7 md:h-7 text-white" />
                     </div>
-                    <span className="text-xs font-black text-center leading-tight uppercase tracking-tight group-hover:text-blue-400 transition-colors">{m.description}</span>
+                    <span className="text-[10px] md:text-xs font-black text-center leading-tight uppercase tracking-tight group-hover:text-blue-400 transition-colors">{m.description}</span>
                   </button>
                 ))}
               </div>
             </div>
-          ) : (
-            <button
-              onClick={resetSimulator}
-              className="bg-slate-800/90 hover:bg-slate-700 backdrop-blur-md px-10 py-4 rounded-2xl flex items-center gap-3 transition-all shadow-2xl border border-slate-600 mb-8 font-black uppercase text-xs tracking-widest"
-            >
-              <RefreshCw className="w-5 h-5 text-blue-400" /> End Mission & Recalibrate
-            </button>
           )}
         </div>
       </div>
