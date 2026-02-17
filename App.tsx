@@ -4,11 +4,12 @@ import { Canvas, ThreeElements } from '@react-three/fiber';
 import { Sky, OrbitControls, ContactShadows, Environment, Loader } from '@react-three/drei';
 import { Compass, MapPin, RefreshCw, Trophy, Clock, Ruler, Info, Activity, Radio, Loader2, Navigation2, Crosshair } from 'lucide-react';
 import Scene from './components/Scene';
+import MobileControls from './components/MobileControls';
 import CampusEnvironment from './components/CampusEnvironment';
 import WifiScanner from './components/WifiScanner';
 import ResultsDashboard from './components/ResultsDashboard';
 import { MISSIONS, CAMPUS_BUILDINGS } from './constants';
-import { NavigationState, RSSIReading } from './types';
+import { RSSIReading, NavigationState } from './types';
 
 declare global {
   namespace JSX {
@@ -80,6 +81,11 @@ const App: React.FC = () => {
   });
   const [gameStarted, setGameStarted] = useState(false);
   const [showResults, setShowResults] = useState(false);
+  const [mobileInput, setMobileInput] = useState({
+    move: { x: 0, y: 0 },
+    look: { x: 0, y: 0 },
+    vertical: 0
+  });
 
   const startMission = (index: number) => {
     setActiveMissionIndex(index);
@@ -138,36 +144,59 @@ const App: React.FC = () => {
     return Math.sqrt(dx * dx + dz * dz);
   }, [playerCoords, targetBuilding]);
 
+  // Handlers for Mobile Controls
+  const handleMobileMove = useCallback((x: number, y: number) => {
+    setMobileInput(prev => ({ ...prev, move: { x, y } }));
+  }, []);
+
+  const handleMobileLook = useCallback((dx: number, dy: number) => {
+    setMobileInput(prev => ({ ...prev, look: { x: dx, y: dy } }));
+  }, []);
+
+  const handleMobileVertical = useCallback((val: number) => {
+    setMobileInput(prev => ({ ...prev, vertical: val }));
+  }, []);
+
   return (
     <div className="relative w-full h-screen bg-slate-950 font-sans text-slate-200 selection:bg-blue-500/30">
-      <Suspense fallback={<LoadingOverlay />}>
-        <Canvas shadows camera={{ position: [0, 15, 20], fov: 60, far: 10000 }}>
-          <Sky sunPosition={[100, 20, 100]} turbidity={0.05} rayleigh={0.5} />
-          <ambientLight intensity={0.5} />
-          <directionalLight position={[50, 50, 25]} intensity={1.5} castShadow shadow-mapSize={[2048, 2048]} />
-          <color attach="background" args={['#0f172a']} />
+      {/* Mobile Controls Layer */}
+      {gameStarted && (
+        <MobileControls
+          onMove={handleMobileMove}
+          onLook={handleMobileLook}
+          onVertical={handleMobileVertical}
+        />
+      )}
 
-          {/* Always render the campus environment */}
-          <CampusEnvironment targetBuildingId={targetBuilding?.id} />
+      <Canvas shadows camera={{ position: [0, 15, 20], fov: 60, far: 10000 }}>
+        <Sky sunPosition={[100, 20, 100]} turbidity={0.05} rayleigh={0.5} />
+        <ambientLight intensity={0.5} />
+        <directionalLight position={[50, 50, 25]} intensity={1.5} castShadow shadow-mapSize={[2048, 2048]} />
+        <color attach="background" args={['#0f172a']} />
 
-          {gameStarted && (
-            <Scene
-              targetBuilding={targetBuilding || undefined}
-              onReached={completeMission}
-              isComplete={navState.isComplete}
-              researchMode={researchMode}
-              onWifiUpdate={handleWifiUpdate}
-              onMove={(dist) => {
-                setNavState(prev => ({ ...prev, distanceTraveled: prev.distanceTraveled + dist }));
-              }}
-              onPositionUpdate={handlePositionUpdate}
-            />
-          )}
+        {/* Always render the campus environment */}
+        <CampusEnvironment targetBuildingId={targetBuilding?.id} />
 
-          {!gameStarted && <OrbitControls autoRotate autoRotateSpeed={0.5} />}
-          {/* <ContactShadows resolution={1024} scale={150} blur={2.5} opacity={0.6} far={20} color="#000000" /> */}
-        </Canvas>
-      </Suspense>
+        {gameStarted && (
+          <Scene
+            targetBuilding={targetBuilding || undefined}
+            onReached={completeMission}
+            isComplete={navState.isComplete}
+            researchMode={researchMode}
+            onWifiUpdate={handleWifiUpdate}
+            onMove={(dist) => {
+              setNavState(prev => ({ ...prev, distanceTraveled: prev.distanceTraveled + dist }));
+            }}
+            onPositionUpdate={handlePositionUpdate}
+            mobileInput={mobileInput}
+            onMobileLookConsumed={() => setMobileInput(prev => ({ ...prev, look: { x: 0, y: 0 } }))}
+          />
+        )}
+
+
+        {!gameStarted && <OrbitControls autoRotate autoRotateSpeed={0.5} />}
+        {/* <ContactShadows resolution={1024} scale={150} blur={2.5} opacity={0.6} far={20} color="#000000" /> */}
+      </Canvas>
 
       <div className="absolute inset-0 pointer-events-none flex flex-col justify-between p-6 overflow-hidden">
         {/* Top Header */}

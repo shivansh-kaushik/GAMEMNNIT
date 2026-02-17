@@ -20,9 +20,7 @@ const Tree: React.FC<{ position: [number, number, number] }> = ({ position }) =>
 );
 
 const CampusEnvironment: React.FC<CampusEnvironmentProps> = ({ targetBuildingId }) => {
-    // Load the custom satellite map using standard loader for debugging
-    const mapTexture = useLoader(THREE.TextureLoader, '/campus_map.jpg');
-    console.log("CampusEnvironment Rendered. Texture:", mapTexture);
+    // Texture loading was causing issues. Using procedural grid for now.
 
     const treePositions = useMemo(() => {
         return Array.from({ length: 40 }).map(() => [
@@ -39,13 +37,12 @@ const CampusEnvironment: React.FC<CampusEnvironmentProps> = ({ targetBuildingId 
 
     return (
         <>
-            {/* Ground Plane - Satellite Map (200 Acres ~ 900x900m) */}
-            {/* Using MeshBasicMaterial to ignore lighting/shadows and ensure map is always visible */}
-            <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.2, 0]}>
+            {/* Ground Plane - Procedural Grid */}
+            <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.2, 0]} receiveShadow>
                 <planeGeometry args={[900, 900]} />
-                <meshBasicMaterial map={mapTexture} color="#ffffff" side={THREE.DoubleSide} />
+                <meshStandardMaterial color="#1e293b" side={THREE.DoubleSide} roughness={0.9} />
             </mesh>
-            <gridHelper args={[900, 90, "#ffffff", "#ffffff"]} position={[0, 0.1, 0]} material-opacity={0.1} material-transparent />
+            <gridHelper args={[900, 90, "#334155", "#334155"]} position={[0, 0.1, 0]} />
 
             {/* Campus Buildings */}
             {CAMPUS_BUILDINGS.map(b => (

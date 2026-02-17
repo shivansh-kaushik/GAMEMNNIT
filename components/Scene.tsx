@@ -26,9 +26,9 @@ interface SceneProps {
   onWifiUpdate: (readings: RSSIReading[], floor: number, confidence: number) => void;
   isComplete: boolean;
   researchMode: boolean;
+  mobileInput?: { move: { x: number, y: number }, look: { x: number, y: number }, vertical: number };
+  onMobileLookConsumed?: () => void;
 }
-
-
 
 const PlayerModel: React.FC = () => {
   // Use simple geometry instead of loading external OBJ to prevent crashes
@@ -86,7 +86,7 @@ const NavigationPath: React.FC<{ playerPos: THREE.Vector3, targetPos: THREE.Vect
 };
 
 const Scene: React.FC<SceneProps & { onPositionUpdate?: (pos: [number, number, number]) => void }> = ({
-  targetBuilding, onReached, onMove, onWifiUpdate, isComplete, researchMode, onPositionUpdate
+  targetBuilding, onReached, onMove, onWifiUpdate, isComplete, researchMode, onPositionUpdate, mobileInput, onMobileLookConsumed
 }) => {
   const playerRef = useRef<THREE.Group>(null);
   const arrowRef = useRef<THREE.Group>(null);
@@ -133,17 +133,57 @@ const Scene: React.FC<SceneProps & { onPositionUpdate?: (pos: [number, number, n
   useFrame((state) => {
     if (isComplete || !playerRef.current) return;
 
+    // Mobile Look Integration
+    if (mobileInput && (mobileInput.look.x !== 0 || mobileInput.look.y !== 0)) {
+      const sensitivity = 0.05; // Different sensitivity for touch
+      yaw.current -= mobileInput.look.x * sensitivity;
+      pitch.current -= mobileInput.look.y * sensitivity;
+      const limit = Math.PI / 2 - 0.05;
+      pitch.current = Math.max(-limit, Math.min(limit, pitch.current));
+
+      // Consume the look input so it doesn't spin forever if using delta accumulation
+      if (onMobileLookConsumed) onMobileLookConsumed();
+    }
+
+    // Directional Movement
     const moveVector = new THREE.Vector3(0, 0, 0);
+
+    // Keyboard Input
     if (keys['KeyW'] || keys['ArrowUp']) moveVector.z -= 1;
     if (keys['KeyS'] || keys['ArrowDown']) moveVector.z += 1;
     if (keys['KeyA'] || keys['ArrowLeft']) moveVector.x -= 1;
     if (keys['KeyD'] || keys['ArrowRight']) moveVector.x += 1;
 
-    if (keys['Space']) playerRef.current.position.y += VERTICAL_SPEED;
-    if (keys['ShiftLeft']) playerRef.current.position.y = Math.max(0.5, playerRef.current.position.y - VERTICAL_SPEED);
+    // Mobile Input
+    if (mobileInput) {
+      // Mobile joystick y is usually -1 for up, but we mapped it to -1 to 1 in MobileControls
+      // Let's assume MobileControls gives: y < 0 is Up/Forward (screen coords). 
+      // Actually MobileControls: "Invert Y because screen Y is down" -> newY
+      // onMove(newX, newY). 
+      // If I push stick UP: newY is negative. 
+      // We want Forward (-Z). So negative Y -> Negative Z.
+      moveVector.x += mobileInput.move.x;
+      moveVector.z += mobileInput.move.y;
+    }
 
+    // Normalize input BEFORE rotation to ensure consistent speed
     if (moveVector.length() > 0) {
       moveVector.normalize().multiplyScalar(MOVEMENT_SPEED);
+      // Rotate movement vector by Camera Yaw to make it relative to look direction
+      moveVector.applyAxisAngle(new THREE.Vector3(0, 1, 0), yaw.current);
+    }
+
+
+    // Vertical Movement
+    if (keys['Space']) playerRef.current.position.y += VERTICAL_SPEED;
+    if (keys['ShiftLeft'] || keys['ControlLeft'] || keys['KeyC']) playerRef.current.position.y = Math.max(0.5, playerRef.current.position.y - VERTICAL_SPEED);
+
+    if (mobileInput && mobileInput.vertical !== 0) {
+      playerRef.current.position.y = Math.max(0.5, playerRef.current.position.y + (mobileInput.vertical * VERTICAL_SPEED));
+    }
+
+    if (moveVector.length() > 0) {
+
 
       // Collision handling: treat player as a sphere and buildings as AABBs.
       const radius = 0.6;
