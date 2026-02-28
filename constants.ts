@@ -13,37 +13,37 @@ export const MODEL_CONFIG = {
   position: [0, 0, 0] as [number, number, number],
 };
 
-// Refined Spatial Layout - Aligned to create a more "Campus-like" quad structure on the map
+// Refined Spatial Layout - Rebuilt based on Campus Diagram
 export const CAMPUS_BUILDINGS: Building[] = [
-  // Central Admin - The Anchor
-  { id: 'admin', name: 'Admin Block', position: [0, 8, -40], size: [24, 16, 12], color: '#f8fafc' },
-  
-  // Academic Zone
-  { id: 'cse', name: 'CSE Dept', position: [-50, 6, -10], size: [20, 12, 25], color: '#93c5fd' },
-  { id: 'ece', name: 'ECE Dept', position: [-50, 6, 25], size: [20, 12, 25], color: '#cbd5e1' },
-  
-  // Resources
-  { id: 'library', name: 'Central Library', position: [40, 7, 0], size: [22, 14, 22], color: '#fca5a5' },
-  
-  // Student Life
-  { id: 'hostel', name: 'Mega Hostel', position: [0, 10, 60], size: [35, 20, 25], color: '#fbbf24' },
-  { id: 'mp_hall', name: 'MP Hall', position: [50, 8, -50], size: [25, 15, 25], color: '#c084fc' },
-  { id: 'canteen', name: 'Canteen', position: [-20, 3, 40], size: [15, 6, 15], color: '#4ade80' },
+  // Top Row
+  { id: 'seminar', name: 'Seminar Halls', position: [0, 8, -100], size: [30, 16, 25], color: '#94a3b8' },
+  { id: 'admin', name: 'Admin Building', position: [70, 8, -100], size: [60, 16, 25], color: '#f8fafc' },
+
+  // Middle Row
+  { id: 'cc', name: 'Computer Center', position: [-80, 8, 0], size: [35, 16, 30], color: '#60a5fa' },
+  { id: 'dean', name: 'Dean Acadmics', position: [0, 8, 0], size: [35, 16, 30], color: '#93c5fd' },
+  { id: 'academic', name: 'Acadmic Bhulding', position: [90, 8, 10], size: [70, 16, 100], color: '#cbd5e1' },
+  { id: 'sports', name: 'Sports Ground', position: [200, 0.2, 10], size: [100, 0.4, 150], color: '#059669' },
+
+  // Bottom Area
+  { id: 'csed', name: 'CSED Dept', position: [-80, 8, 100], size: [35, 16, 35], color: '#3b82f6' },
+  { id: 'geotech', name: 'Geo Tech Labs', position: [10, 8, 110], size: [25, 16, 60], color: '#64748b' },
+  { id: 'mp_hall', name: 'MP Hall', position: [70, 8, 200], size: [120, 16, 60], color: '#c084fc' },
 ];
 
 export const ACCESS_POINTS: AccessPoint[] = [
-  { id: 'ap1', ssid: 'MNNIT_ADMIN_G', position: [0, 2, 0], floor: 0 },
-  { id: 'ap2', ssid: 'MNNIT_ADMIN_F1', position: [0, 6, 0], floor: 1 },
-  { id: 'ap3', ssid: 'MNNIT_LIB_MAIN', position: [0, 5, 50], floor: 0 },
-  { id: 'ap4', ssid: 'MNNIT_CSE_WIFI', position: [-45, 2, 20], floor: 0 },
-  { id: 'ap5', ssid: 'MNNIT_MEGA_HOSTEL', position: [50, 5, -60], floor: 0 },
+  { id: 'ap1', ssid: 'MNNIT_ADMIN_WIFI', position: [70, 2, -100], floor: 0 },
+  { id: 'ap2', ssid: 'MNNIT_CC_PUBLIC', position: [-80, 2, 0], floor: 0 },
+  { id: 'ap3', ssid: 'MNNIT_ACADEMIC_F1', position: [90, 6, 10], floor: 1 },
+  { id: 'ap4', ssid: 'MNNIT_CSED_DEPT', position: [-80, 2, 100], floor: 0 },
+  { id: 'ap5', ssid: 'MNNIT_MP_HALL', position: [70, 2, 200], floor: 0 },
 ];
 
 export const MISSIONS: Mission[] = [
-  { id: 'm1', targetId: 'library', description: 'Route to Central Library' },
-  { id: 'm2', targetId: 'cse', description: 'Find CSE Department' },
-  { id: 'm3', targetId: 'hostel', description: 'Return to Mega Hostel' },
-  { id: 'm4', targetId: 'admin', description: 'Admin Floor 1 (RSSI Floor Test)' },
+  { id: 'm1', targetId: 'academic', description: 'Reach the Acadmic Bhulding' },
+  { id: 'm2', targetId: 'cc', description: 'Locate the Computer Center' },
+  { id: 'm3', targetId: 'admin', description: 'Go to Admin Building' },
+  { id: 'm4', targetId: 'csed', description: 'Find CSED Dept' },
 ];
 
 export const PLAYER_START_POS: [number, number, number] = [0, 1, -20];

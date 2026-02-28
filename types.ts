@@ -1,11 +1,31 @@
-
 export interface Building {
   id: string;
   name: string;
+  type: string;
   position: [number, number, number];
   size: [number, number, number];
-  color: string;
+  color?: string;
 }
+
+export interface BuildingRecord {
+  $id: string;
+  name: string;
+  type: string;
+  lat: number;
+  lng: number;
+  width: number;
+  height: number;
+  depth: number;
+  color?: string;
+}
+
+export interface RoadRecord {
+  $id: string;
+  name: string;
+  waypoints: string; // JSON string [lat, lng][]
+}
+
+export interface BuildingData extends Building { }
 
 export interface AccessPoint {
   id: string;

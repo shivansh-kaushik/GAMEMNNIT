@@ -1,11 +1,37 @@
-*, *::before, *::after {
-  margin: 0;
-  padding: 0;
+@import 'leaflet/dist/leaflet.css';
+
+*,
+*::before,
+*::after {
   box-sizing: border-box;
 }
 
-html, body, #root {
+html,
+body,
+#root {
   width: 100%;
   height: 100%;
+  margin: 0;
+  padding: 0;
   overflow: hidden;
+  background: #000;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+/* Custom Leaflet Dark Mode */
+.leaflet-container {
+  background: #111 !important;
+  color: white;
+}
+
+.leaflet-tile {
+  filter: brightness(0.6) invert(1) contrast(3) hue-rotate(200deg) saturate(0.3) brightness(0.7);
+}
+
+.leaflet-popup-content-wrapper,
+.leaflet-popup-tip {
+  background: rgba(0, 0, 0, 0.8) !important;
+  color: #00ff88 !important;
+  border: 1px solid #00ff88;
+  backdrop-filter: blur(10px);
 }
