@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useRef } from 'react';
 
 interface MobileControlsProps {
     onMove: (forward: number, turn: number) => void;
@@ -12,20 +12,23 @@ export const MobileControls: React.FC<MobileControlsProps> = ({ onMove, onJump, 
     const [joystickActive, setJoystickActive] = useState(false);
     const [joystickPos, setJoystickPos] = useState({ x: 0, y: 0 });
 
-    // For touch-to-look
     const lastTouchRef = useRef<{ x: number, y: number } | null>(null);
+    const touchStartRef = useRef<{ x: number, y: number, time: number } | null>(null);
 
     const handleJoystickStart = (e: React.TouchEvent) => {
+        e.stopPropagation();
         setJoystickActive(true);
         updateJoystick(e.touches[0]);
     };
 
     const handleJoystickMove = (e: React.TouchEvent) => {
+        e.stopPropagation();
         if (!joystickActive) return;
         updateJoystick(e.touches[0]);
     };
 
-    const handleJoystickEnd = () => {
+    const handleJoystickEnd = (e: React.TouchEvent) => {
+        e.stopPropagation();
         setJoystickActive(false);
         setJoystickPos({ x: 0, y: 0 });
         onMove(0, 0);
@@ -49,156 +52,96 @@ export const MobileControls: React.FC<MobileControlsProps> = ({ onMove, onJump, 
         }
 
         setJoystickPos({ x: dx, y: dy });
-
-        // forward: -dy (up is negative Y), turn: dx
         onMove(-dy / maxRadius, dx / maxRadius);
     };
 
-    const handleLookTouchStart = (e: React.TouchEvent) => {
-        // Prevent triggering look when touching the joystick
-        if (joystickRef.current?.contains(e.target as Node)) return;
-        lastTouchRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+    const handleMainTouchStart = (e: React.TouchEvent) => {
+        const touch = e.touches[0];
+        lastTouchRef.current = { x: touch.clientX, y: touch.clientY };
+        touchStartRef.current = { x: touch.clientX, y: touch.clientY, time: Date.now() };
     };
 
-    const handleLookTouchMove = (e: React.TouchEvent) => {
+    const handleMainTouchMove = (e: React.TouchEvent) => {
         if (!lastTouchRef.current) return;
 
         const touch = e.touches[0];
         const dx = touch.clientX - lastTouchRef.current.x;
         const dy = touch.clientY - lastTouchRef.current.y;
 
-        // Apply a small deadzone/sensitivity boost
-        if (Math.abs(dx) > 0.5 || Math.abs(dy) > 0.5) {
-            onLook(dx * 0.8, dy * 0.8); // Increased sensitivity from 0.5 to 0.8
+        if (Math.abs(dx) > 0.2 || Math.abs(dy) > 0.2) {
+            onLook(dx * 1.5, dy * 1.5);
         }
 
         lastTouchRef.current = { x: touch.clientX, y: touch.clientY };
     };
 
-    const handleLookTouchEnd = () => {
+    const handleMainTouchEnd = (e: React.TouchEvent) => {
+        if (touchStartRef.current) {
+            const touch = e.changedTouches[0];
+            const dx = Math.abs(touch.clientX - touchStartRef.current.x);
+            const dy = Math.abs(touch.clientY - touchStartRef.current.y);
+            const duration = Date.now() - touchStartRef.current.time;
+
+            if (dx < 10 && dy < 10 && duration < 200) {
+                // Dispatch a click to trigger block placement in Controls.tsx
+                window.dispatchEvent(new MouseEvent('click', {
+                    view: window,
+                    bubbles: true,
+                    cancelable: true
+                }));
+            }
+        }
         lastTouchRef.current = null;
+        touchStartRef.current = null;
+    };
+
+    const btnStyle: React.CSSProperties = {
+        width: '70px', height: '70px', borderRadius: '20px', display: 'flex', flexDirection: 'column',
+        alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: '900',
+        backdropFilter: 'blur(10px)', boxShadow: '0 8px 15px rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)',
+        cursor: 'pointer', outline: 'none'
     };
 
     return (
         <div
-            style={{
-                position: 'fixed',
-                inset: 0,
-                zIndex: 2000,
-                pointerEvents: 'none',
-                userSelect: 'none',
-                touchAction: 'none'
-            }}
-            onTouchStart={handleLookTouchStart}
-            onTouchMove={handleLookTouchMove}
-            onTouchEnd={handleLookTouchEnd}
+            style={{ position: 'fixed', inset: 0, zIndex: 2000, pointerEvents: 'auto', userSelect: 'none', touchAction: 'none', background: 'transparent' }}
+            onTouchStart={handleMainTouchStart}
+            onTouchMove={handleMainTouchMove}
+            onTouchEnd={handleMainTouchEnd}
         >
-            {/* Left side Joystick Area */}
             <div
                 ref={joystickRef}
                 style={{
-                    position: 'absolute',
-                    bottom: '60px',
-                    left: '60px',
-                    width: '120px',
-                    height: '120px',
-                    background: 'rgba(255,255,255,0.1)',
-                    borderRadius: '50%',
-                    border: '2px solid rgba(255,255,255,0.2)',
-                    pointerEvents: 'auto',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    backdropFilter: 'blur(5px)'
+                    position: 'absolute', bottom: '40px', left: '40px', width: '130px', height: '130px',
+                    background: 'rgba(255,255,255,0.05)', borderRadius: '50%', border: '1px solid rgba(255,255,255,0.1)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(10px)'
                 }}
                 onTouchStart={handleJoystickStart}
                 onTouchMove={handleJoystickMove}
                 onTouchEnd={handleJoystickEnd}
             >
                 <div style={{
-                    width: '50px',
-                    height: '50px',
-                    background: '#00ff88',
-                    borderRadius: '50%',
-                    transform: `translate(${joystickPos.x}px, ${joystickPos.y}px)`,
-                    boxShadow: '0 0 20px rgba(0,255,136,0.5)',
-                    transition: joystickActive ? 'none' : 'transform 0.2s ease-out'
+                    width: '55px', height: '55px', background: 'radial-gradient(circle, #00ff88 0%, #008855 100%)',
+                    borderRadius: '50%', transform: `translate(${joystickPos.x}px, ${joystickPos.y}px)`,
+                    boxShadow: '0 0 20px rgba(0,255,136,0.5)', transition: joystickActive ? 'none' : 'transform 0.2s cubic-bezier(0.18, 0.89, 0.32, 1.28)'
                 }} />
             </div>
 
-            {/* Right side Buttons */}
-            <div style={{
-                position: 'absolute',
-                bottom: '80px',
-                right: '40px',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '20px',
-                pointerEvents: 'none'
-            }}>
-                {/* Jump Button */}
+            <div style={{ position: 'absolute', bottom: '40px', right: '30px', display: 'flex', flexDirection: 'column', gap: '15px' }}>
                 <div
-                    style={{
-                        width: '70px',
-                        height: '70px',
-                        background: 'rgba(0,255,136,0.2)',
-                        borderRadius: '50%',
-                        border: '2px solid #00ff88',
-                        pointerEvents: 'auto',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        fontSize: '12px',
-                        fontWeight: 'bold',
-                        color: '#00ff88',
-                        boxShadow: '0 0 15px rgba(0,255,136,0.3)',
-                        backdropFilter: 'blur(5px)'
-                    }}
-                    onTouchStart={() => onJump(true)}
-                    onTouchEnd={() => onJump(false)}
+                    style={{ ...btnStyle, background: 'rgba(0,255,136,0.15)', color: '#00ff88', border: '1px solid rgba(0,255,136,0.3)' }}
+                    onTouchStart={(e) => { e.stopPropagation(); onJump(true); }}
+                    onTouchEnd={(e) => { e.stopPropagation(); onJump(false); }}
                 >
-                    UP
+                    <span style={{ fontSize: '18px' }}>▲</span> JUMP
                 </div>
-
-                {/* Down Button */}
                 <div
-                    style={{
-                        width: '70px',
-                        height: '70px',
-                        background: 'rgba(255,68,68,0.2)',
-                        borderRadius: '50%',
-                        border: '2px solid #ff4444',
-                        pointerEvents: 'auto',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        fontSize: '12px',
-                        fontWeight: 'bold',
-                        color: '#ff4444',
-                        boxShadow: '0 0 15px rgba(255,68,68,0.3)',
-                        backdropFilter: 'blur(5px)'
-                    }}
-                    onTouchStart={() => onDown(true)}
-                    onTouchEnd={() => onDown(false)}
+                    style={{ ...btnStyle, background: 'rgba(255,68,68,0.15)', color: '#ff4444', border: '1px solid rgba(255,68,68,0.3)' }}
+                    onTouchStart={(e) => { e.stopPropagation(); onDown(true); }}
+                    onTouchEnd={(e) => { e.stopPropagation(); onDown(false); }}
                 >
-                    DOWN
+                    <span style={{ fontSize: '18px' }}>▼</span> DOWN
                 </div>
-            </div>
-
-            {/* Top Indicator */}
-            <div style={{
-                position: 'absolute',
-                top: '20px',
-                left: '50%',
-                transform: 'translateX(-50%)',
-                background: 'rgba(0,0,0,0.5)',
-                padding: '4px 12px',
-                borderRadius: '20px',
-                fontSize: '10px',
-                color: '#fff',
-                border: '1px solid rgba(255,255,255,0.2)'
-            }}>
-                TOUCH AREA: LOOK (RIGHT) | MOVE (LEFT)
             </div>
         </div>
     );

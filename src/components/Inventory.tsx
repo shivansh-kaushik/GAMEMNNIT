@@ -26,31 +26,51 @@ interface InventoryProps {
 }
 
 export const Inventory: React.FC<InventoryProps> = ({ onSelect, onClose }) => {
+    const isMobile = window.innerWidth < 640;
+
     return (
         <div style={{
             position: 'fixed',
             top: '50%',
             left: '50%',
             transform: 'translate(-50%, -50%)',
-            width: '400px',
-            backgroundColor: 'rgba(50, 50, 50, 0.95)',
-            border: '4px solid #000',
-            padding: '20px',
+            width: isMobile ? '90vw' : '400px',
+            backgroundColor: 'rgba(30, 30, 30, 0.98)',
+            border: '2px solid #00ff88',
+            borderRadius: '12px',
+            padding: isMobile ? '15px' : '20px',
             color: 'white',
-            fontFamily: '"Courier New", Courier, monospace',
-            zIndex: 1000,
-            pointerEvents: 'auto'
+            fontFamily: 'monospace',
+            zIndex: 4000,
+            pointerEvents: 'auto',
+            boxShadow: '0 0 30px rgba(0,0,0,0.8), 0 0 10px rgba(0,255,136,0.2)',
+            backdropFilter: 'blur(10px)'
         }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '15px' }}>
-                <h2 style={{ margin: 0, color: '#ffcc00' }}>CREATIVE INVENTORY</h2>
-                <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'red', cursor: 'pointer', fontWeight: 'bold' }}>X</button>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px', alignItems: 'center' }}>
+                <h2 style={{ margin: 0, color: '#00ff88', fontSize: isMobile ? '16px' : '20px', letterSpacing: '1px' }}>BLOCKS</h2>
+                <button
+                    onClick={onClose}
+                    style={{
+                        background: 'rgba(255,50,50,0.2)',
+                        border: '1px solid #ff4444',
+                        color: '#ff4444',
+                        cursor: 'pointer',
+                        fontWeight: 'bold',
+                        borderRadius: '50%',
+                        width: '30px',
+                        height: '30px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                    }}
+                >✕</button>
             </div>
 
             <div style={{
                 display: 'grid',
-                gridTemplateColumns: 'repeat(4, 1fr)',
-                gap: '10px',
-                maxHeight: '300px',
+                gridTemplateColumns: isMobile ? 'repeat(auto-fill, minmax(70px, 1fr))' : 'repeat(3, 1fr)',
+                gap: '12px',
+                maxHeight: isMobile ? '60vh' : '400px',
                 overflowY: 'auto',
                 paddingRight: '5px'
             }}>
@@ -60,26 +80,31 @@ export const Inventory: React.FC<InventoryProps> = ({ onSelect, onClose }) => {
                         onClick={() => onSelect(item)}
                         style={{
                             aspectRatio: '1',
-                            backgroundColor: '#333',
-                            border: '2px solid #555',
+                            backgroundColor: 'rgba(255,255,255,0.05)',
+                            border: '1px solid rgba(255,255,255,0.1)',
+                            borderRadius: '8px',
                             display: 'flex',
                             flexDirection: 'column',
                             alignItems: 'center',
                             justifyContent: 'center',
                             cursor: 'pointer',
-                            fontSize: '8px',
+                            fontSize: '10px',
                             textAlign: 'center',
-                            padding: '4px'
+                            padding: '8px',
+                            transition: 'all 0.2s ease',
+                            outline: 'none'
                         }}
                     >
                         <div style={{
-                            width: '30px',
-                            height: '30px',
+                            width: isMobile ? '35px' : '40px',
+                            height: isMobile ? '35px' : '40px',
                             backgroundColor: item.color,
-                            border: '1px solid #777',
-                            marginBottom: '4px'
+                            border: '2px solid rgba(255,255,255,0.2)',
+                            borderRadius: '4px',
+                            marginBottom: '6px',
+                            boxShadow: `0 4px 10px ${item.color}44`
                         }} />
-                        {item.name}
+                        <span style={{ color: '#ccc', fontWeight: '500' }}>{item.name}</span>
                     </div>
                 ))}
             </div>

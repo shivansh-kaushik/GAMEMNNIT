@@ -36,9 +36,9 @@ export const VoxelCampus: React.FC<VoxelCampusProps> = ({ selectedBuildingId, on
     const [gpsEnabled, setGpsEnabled] = useState(false);
 
     const { position: gpsPos, error: gpsError } = useGPSTracking(gpsEnabled);
-
     const [activePath, setActivePath] = useState<PathNode[]>([]);
-    const [searchTerm, setSearchTerm] = useState('');
+
+    const isMobile = window.innerWidth < 640;
 
     const navigationGrid = useMemo(() => {
         const grid = Array(GRID_SIZE).fill(null).map(() => Array(GRID_SIZE).fill("B"));
@@ -47,9 +47,7 @@ export const VoxelCampus: React.FC<VoxelCampusProps> = ({ selectedBuildingId, on
         roads.forEach(([rx, rz]) => {
             const x = Math.round(rx + offset);
             const z = Math.round(rz + offset);
-            if (x >= 0 && x < GRID_SIZE && z >= 0 && z < GRID_SIZE) {
-                grid[z][x] = "R";
-            }
+            if (x >= 0 && x < GRID_SIZE && z >= 0 && z < GRID_SIZE) grid[z][x] = "R";
         });
 
         buildings.forEach(b => {
@@ -57,21 +55,15 @@ export const VoxelCampus: React.FC<VoxelCampusProps> = ({ selectedBuildingId, on
                 for (let dz = 0; dz < b.size[2]; dz++) {
                     const x = Math.round(b.position[0] + dx + offset);
                     const z = Math.round(b.position[2] + dz + offset);
-                    if (x >= 0 && x < GRID_SIZE && z >= 0 && z < GRID_SIZE) {
-                        grid[z][x] = "B";
-                    }
+                    if (x >= 0 && x < GRID_SIZE && z >= 0 && z < GRID_SIZE) grid[z][x] = "B";
                 }
             }
         });
-
         return grid;
     }, [buildings, roads]);
 
     const pathfinder = useMemo(() => new Pathfinder(navigationGrid), [navigationGrid]);
-
-    const blockedAreas = useMemo(() =>
-        buildings.map(b => ({ position: b.position, size: b.size })),
-        [buildings]);
+    const blockedAreas = useMemo(() => buildings.map(b => ({ position: b.position, size: b.size })), [buildings]);
 
     useEffect(() => {
         account.get()
@@ -80,11 +72,7 @@ export const VoxelCampus: React.FC<VoxelCampusProps> = ({ selectedBuildingId, on
     }, []);
 
     const handleLogin = async () => {
-        account.createOAuth2Session(
-            'google' as any,
-            `${window.location.origin}`,
-            `${window.location.origin}`
-        );
+        account.createOAuth2Session('google' as any, `${window.location.origin}`, `${window.location.origin}`);
     };
 
     const handleLogout = async () => {
@@ -98,19 +86,18 @@ export const VoxelCampus: React.FC<VoxelCampusProps> = ({ selectedBuildingId, on
             const res = await databases.listDocuments(DB_ID, BUILDINGS_COLLECTION_ID);
             const mapped: BuildingData[] = res.documents.map((d: any) => {
                 const doc = d as any as BuildingRecord;
-                const voxelPos = latLngToVoxel(doc.lat, doc.lng);
                 return {
                     id: doc.$id,
                     name: doc.name,
                     type: doc.type,
-                    position: voxelPos,
+                    position: latLngToVoxel(doc.lat, doc.lng),
                     size: [doc.width, doc.height, doc.depth],
                     color: doc.color,
                 };
             });
             setBuildings(mapped);
         } catch (e) {
-            console.warn('Buildings collection error:', e);
+            console.warn('Buildings collection error fallback used');
             setBuildings([
                 { id: 'academic', name: "ACADEMIC BUILDING", type: 'academic', position: [25, 0, 15], size: [40, 12, 30], color: "#fef3c7" },
                 { id: 'admin', name: "ADMIN BUILDING", type: 'admin', position: [20, 0, -25], size: [50, 16, 25], color: "#d9b38c" },
@@ -132,13 +119,9 @@ export const VoxelCampus: React.FC<VoxelCampusProps> = ({ selectedBuildingId, on
             });
             setRoads(allRoadTiles);
         } catch (e) {
-            console.warn('Roads collection error:', e);
+            console.warn('Roads collection error fallback used');
             const mainRoad: [number, number][] = [];
-            for (let x = 0; x < 100; x++) {
-                for (let z = -5; z < 5; z++) {
-                    mainRoad.push([x - 20, z]);
-                }
-            }
+            for (let x = -20; x < 80; x++) for (let z = -5; z < 5; z++) mainRoad.push([x, z]);
             setRoads(mainRoad);
         }
     }, []);
@@ -146,15 +129,14 @@ export const VoxelCampus: React.FC<VoxelCampusProps> = ({ selectedBuildingId, on
     const fetchBlocks = useCallback(async () => {
         try {
             const res = await databases.listDocuments(DB_ID, BLOCKS_COLLECTION_ID);
-            const mapped = res.documents.map((d) => ({
+            setPlacedBlocks(res.documents.map((d) => ({
                 id: d.$id,
-                position: JSON.parse(d.position) as [number, number, number],
+                position: JSON.parse(d.position),
                 type: d.type as 'B' | 'R',
                 color: d.color,
-            }));
-            setPlacedBlocks(mapped);
+            })));
         } catch (e) {
-            console.warn('Appwrite DB blocks error:', e);
+            console.warn('Blocks fetch error');
         }
     }, []);
 
@@ -173,11 +155,8 @@ export const VoxelCampus: React.FC<VoxelCampusProps> = ({ selectedBuildingId, on
                 color: selectedBlock.color,
             });
             fetchBlocks();
-        } catch (e) {
-            console.error('Error placing block:', e);
-        }
+        } catch (e) { console.error('Error placing block:', e); }
     }, [isAdmin, selectedBlock, fetchBlocks]);
-
 
     const buttonStyle = (bg: string, color = 'white') => ({
         padding: '7px 14px', borderRadius: '5px', border: 'none',
@@ -187,41 +166,30 @@ export const VoxelCampus: React.FC<VoxelCampusProps> = ({ selectedBuildingId, on
         padding: '2px 6px', borderRadius: '4px', border: '1px solid #555',
         background: 'rgba(0,0,0,0.4)', color: '#aaa', cursor: 'pointer', fontSize: '9px'
     };
-    const navBtnStyle = {
-        padding: '5px 8px', textAlign: 'left' as const, fontSize: '10px',
-        border: '1px solid rgba(255,255,255,0.1)', cursor: 'pointer', borderRadius: '3px',
-        transition: 'all 0.15s',
-    };
 
     return (
-        <div style={{ width: '100vw', height: '100vh', background: '#000', position: 'relative', touchAction: 'none' }}>
-            <Canvas shadows camera={{ position: [20, 30, 60], fov: 60 }}>
+        <div style={{ width: '100vw', height: '100vh', background: '#000', position: 'relative', touchAction: 'none', overflow: 'hidden' }}>
+            <Canvas shadows camera={{ position: [20, 30, 60], fov: isMobile ? 75 : 60 }} style={{ position: 'absolute', inset: 0 }}>
                 <Sky sunPosition={[100, 20, 100]} />
                 <ambientLight intensity={0.5} />
                 <hemisphereLight intensity={0.5} groundColor="#444444" />
-                <directionalLight position={[50, 100, 50]} intensity={1.5} castShadow shadow-mapSize={[4096, 4096]} />
+                <directionalLight position={[50, 100, 50]} intensity={1.5} castShadow shadow-mapSize={[isMobile ? 1024 : 4096, isMobile ? 1024 : 4096]} />
 
                 <CampusLayout buildings={buildings} roads={roads} />
                 <DynamicBlocks blocks={placedBlocks} />
                 <PathRenderer path={activePath} />
-                <TreeRenderer
-                    count={150}
-                    boundary={180}
-                    blockedAreas={blockedAreas}
-                />
+                <TreeRenderer count={isMobile ? 60 : 150} boundary={180} blockedAreas={blockedAreas} />
 
-                <Suspense fallback={<Html center><span style={{ color: 'white', background: 'rgba(0,0,0,0.6)', padding: '8px 16px', borderRadius: 8 }}>🌍 Loading Map...</span></Html>}>
+                <Suspense fallback={<Html center><span style={{ color: 'white', background: 'rgba(0,0,0,0.6)', padding: '8px 16px', borderRadius: 8, fontSize: '12px' }}>🌍 Loading Map...</span></Html>}>
                     <MapboxGround center={MNNIT_CENTER} zoom={18} size={200} />
                 </Suspense>
 
-                {/* GPS Blue Dot in 3D */}
                 {gpsPos && (
                     <mesh position={[gpsPos[0], gpsPos[1] + 1, gpsPos[2]]}>
                         <sphereGeometry args={[0.5, 32, 32]} />
                         <meshStandardMaterial color="#3b82f6" emissive="#3b82f6" emissiveIntensity={2} />
-                        <pointLight color="#3b82f6" intensity={2} distance={10} />
                         <Html center distanceFactor={15}>
-                            <div style={{ color: '#3b82f6', background: 'rgba(255,255,255,0.8)', padding: '2px 6px', borderRadius: '10px', fontSize: '9px', fontWeight: 'bold', whiteSpace: 'nowrap' }}>YOU</div>
+                            <div style={{ color: '#3b82f6', background: 'rgba(255,255,255,0.8)', padding: '2px 6px', borderRadius: '10px', fontSize: '9px', fontWeight: 'bold', pointerEvents: 'none' }}>YOU</div>
                         </Html>
                     </mesh>
                 )}
@@ -239,69 +207,39 @@ export const VoxelCampus: React.FC<VoxelCampusProps> = ({ selectedBuildingId, on
                             const b = buildings.find(b => b.id === activeDestId);
                             if (b) {
                                 const offset = Math.floor(GRID_SIZE / 2);
-                                let targetX = b.position[0] + Math.floor(b.size[0] / 2);
-                                let targetZ = b.position[2] + Math.floor(b.size[2] / 2);
-                                let nearestX = Math.round(targetX) + offset;
-                                let nearestZ = Math.round(targetZ) + offset;
-                                if (navigationGrid[nearestZ]?.[nearestX] !== "R") {
-                                    let found = false;
-                                    for (let r = 1; r < 10 && !found; r++) {
-                                        for (let dx = -r; dx <= r && !found; dx++) {
-                                            for (let dz = -r; dz <= r && !found; dz++) {
-                                                const nx = nearestX + dx;
-                                                const nz = nearestZ + dz;
-                                                if (navigationGrid[nz]?.[nx] === "R") {
-                                                    nearestX = nx;
-                                                    nearestZ = nz;
-                                                    found = true;
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
                                 const path = pathfinder.findPath(
                                     Math.round(pos[0]) + offset, Math.round(pos[2]) + offset,
-                                    nearestX, nearestZ
+                                    Math.round(b.position[0] + b.size[0] / 2) + offset, Math.round(b.position[2] + b.size[2] / 2) + offset
                                 );
                                 setActivePath(path.map(n => ({ ...n, x: n.x - offset, z: n.z - offset })));
                             }
-                        } else {
-                            setActivePath([]);
-                        }
+                        } else setActivePath([]);
                     }}
                 />
             </Canvas>
 
-            <div style={{ position: 'absolute', top: '20px', left: '20px', color: 'white', fontFamily: '"Courier New", monospace', pointerEvents: 'none', width: '300px' }}>
-                <h1 style={{ margin: 0, fontSize: '18px', letterSpacing: '2px', textShadow: '0 0 10px #00ff88' }}>
-                    🏛 VOXEL WORLD
-                </h1>
-                <div style={{ pointerEvents: 'auto', marginTop: '14px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {/* UI Overlays */}
+            <div style={{ position: 'absolute', top: isMobile ? '10px' : '20px', left: isMobile ? '10px' : '20px', color: 'white', fontFamily: 'monospace', pointerEvents: 'none', width: isMobile ? 'calc(100% - 20px)' : '300px', zIndex: 10 }}>
+                <h1 style={{ margin: 0, fontSize: isMobile ? '16px' : '18px', letterSpacing: '2px', textShadow: '0 0 10px #00ff88' }}>🏛 MNNIT TWIN</h1>
+                <div style={{ pointerEvents: 'auto', marginTop: isMobile ? '10px' : '14px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                     {!user ? (
-                        <button onClick={handleLogin} style={buttonStyle('#4285F4')}>
-                            🔑 LOGIN
-                        </button>
+                        <button onClick={handleLogin} style={buttonStyle('#4285F4')}>🔑 LOGIN WITH GOOGLE</button>
                     ) : (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: '#aaa' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', background: 'rgba(0,0,0,0.5)', padding: '10px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)', backdropFilter: 'blur(5px)' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11px', color: '#aaa' }}>
                                 <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.email}</span>
                                 <button onClick={handleLogout} style={smallBtnStyle}>LOGOUT</button>
                             </div>
-                            <div style={{ display: 'flex', gap: '6px' }}>
-                                <button onClick={() => setGpsEnabled(!gpsEnabled)} style={buttonStyle(gpsEnabled ? '#00cc44' : '#555', gpsEnabled ? '#000' : '#fff')}>
-                                    📍 GPS {gpsEnabled ? 'ON' : 'OFF'}
-                                </button>
-                                <div onClick={() => setShowInventory(true)} style={{ width: 36, height: 36, background: selectedBlock.color, border: '2px solid #ffcc00', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, borderRadius: 4 }}>
-                                    INV
-                                </div>
+                            <div style={{ display: 'flex', gap: '8px' }}>
+                                <button onClick={() => setGpsEnabled(!gpsEnabled)} style={{ ...buttonStyle(gpsEnabled ? '#00cc44' : '#333', gpsEnabled ? '#000' : '#fff'), flex: 1 }}>📍 GPS {gpsEnabled ? 'ON' : 'OFF'}</button>
+                                <button onClick={() => setShowInventory(true)} style={{ width: 40, height: 40, border: '2px solid #00ff88', cursor: 'pointer', borderRadius: 6, background: selectedBlock.color, boxShadow: `0 0 10px ${selectedBlock.color}88` }}>📦</button>
                             </div>
-                            {gpsError && <div style={{ color: '#ff5555', fontSize: 10 }}>⚠ {gpsError}</div>}
                         </div>
                     )}
                 </div>
             </div>
 
-            <div style={{ position: 'absolute', bottom: '100px', left: '20px', pointerEvents: 'auto' }}>
+            <div style={{ position: 'absolute', top: isMobile ? '10px' : 'auto', bottom: isMobile ? 'auto' : '120px', right: isMobile ? '10px' : 'auto', left: isMobile ? 'auto' : '20px', pointerEvents: 'auto', transform: isMobile ? 'scale(0.8)' : 'none', transformOrigin: 'top right', zIndex: 11 }}>
                 <Minimap userPos={[0, 0, 0]} buildings={buildings} destination={buildings.find(b => b.id === selectedBuildingId)?.name} />
             </div>
 
