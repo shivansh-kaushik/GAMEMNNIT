@@ -1,209 +1,254 @@
-
 # Smart Campus Digital Twin Navigation System (GAMEMNNIT)
+
+![Status](https://img.shields.io/badge/status-research%20prototype-green)
+![Platform](https://img.shields.io/badge/platform-web%203D%20navigation-blue)
+![License](https://img.shields.io/badge/license-academic-orange)
+
+---
 
 ## Overview
 
-GAMEMNNIT is a **Smart Campus Navigation System** designed to assist users in navigating the **Motilal Nehru National Institute of Technology (MNNIT) Allahabad campus** using a digital twin environment.
+GAMEMNNIT is a **Smart Campus Digital Twin Navigation System** developed for the Motilal Nehru National Institute of Technology (MNNIT) Allahabad.
 
-The system integrates **geospatial data, graph-based pathfinding algorithms, WiFi RSSI localization, and 3D visualization** to simulate intelligent campus navigation.
+The system integrates:
 
-The project demonstrates how **Digital Twin + GIS + Navigation Algorithms** can be used to create a smart campus navigation framework.
+- 🌍 Geospatial Intelligence (GIS datasets)
+- 🗺️ Graph-based Pathfinding (A* Algorithm)
+- 📡 WiFi RSSI Localization
+- 🏫 3D Digital Twin Visualization (Three.js)
+- 📱 Mobile-Friendly Navigation Controls
 
-Live Demo  
+This project demonstrates how **Digital Twin + GIS + Intelligent Navigation Algorithms** can be combined to create a smart campus navigation framework.
+
+🔗 Live Demo:  
 https://gamemnnit.vercel.app/
 
 ---
 
 # Research Motivation
 
-Large campuses are difficult to navigate for:
+Large university campuses are difficult to navigate due to:
 
-- new students
-- visitors
-- conference participants
-- emergency responders
+- Complex spatial layouts
+- Lack of pedestrian-level path data
+- GPS inaccuracies in dense environments
 
-Traditional navigation tools such as **static campus maps or generic map services** often fail to provide accurate internal campus navigation.
+Traditional map-based navigation is insufficient for internal campus navigation.
 
-This research proposes a **digital twin based smart campus navigation system** that combines geospatial intelligence and navigation algorithms.
+This research proposes a **Digital Twin-Based Smart Navigation Framework** capable of:
+
+- Modeling campus infrastructure
+- Computing optimal routes
+- Simulating intelligent positioning
+- Visualizing navigation paths in 3D
 
 ---
 
 # System Architecture
 
+```mermaid
+flowchart TD
+    A[User Interface] --> B[Navigation Controller]
+
+    B --> C[Positioning System]
+    C --> C1[GPS Module]
+    C --> C2[WiFi RSSI Localization]
+
+    B --> D[Navigation Engine]
+    D --> D1[A* Pathfinding Algorithm]
+    D --> D2[Campus Graph Network]
+
+    D2 --> E[GIS Data Layer]
+    E --> E1[Campus Paths Dataset]
+    E --> E2[Building Nodes]
+
+    B --> F[3D Digital Twin Environment]
+    F --> F1[Three.js Renderer]
+    F --> F2[Campus Model]
 ```
 
-User Interface
-|
-v
-Navigation Controller
-|
-v
-Positioning System
-(GPS / WiFi RSSI)
-|
-v
-Navigation Engine
-(A* Pathfinding Algorithm)
-|
-v
-Campus Graph Network
-|
-v
-3D Digital Twin Environment
+---
 
+# Navigation Workflow
+
+```mermaid
+flowchart TD
+    A[User Selects Destination] --> B[Retrieve Current Position]
+
+    B --> C[Position Estimation]
+    C --> C1[GPS Coordinates]
+    C --> C2[WiFi RSSI Signals]
+
+    C --> D[Position Fusion]
+
+    D --> E[Navigation Graph]
+
+    E --> F[A* Pathfinding Algorithm]
+
+    F --> G[Compute Optimal Route]
+
+    G --> H[Visualize Route in 3D Campus]
+
+    H --> I[User Follows Navigation Path]
+```
+
+---
+
+# Campus Graph Model
+
+Campus pathways are modeled as a graph:
+
+- Nodes → Buildings / Intersections
+- Edges → Walkable pathways
+
+```mermaid
+graph LR
+    Gate --- Admin
+    Admin --- CSE
+    CSE --- Library
+    CSE --- Hostel
+    Library --- Canteen
 ```
 
 ---
 
 # Core Components
 
-## Digital Twin Campus Model
+## 1️⃣ Digital Twin Campus
 
-The campus environment is represented as a **3D digital twin** allowing users to explore spatial structures and simulate navigation.
+The campus environment is rendered using **Three.js** as an interactive 3D digital twin.
 
-The digital twin includes:
+Features:
 
-- campus buildings
-- pedestrian pathways
-- landmarks
-- spatial coordinates
+- Realistic campus layout
+- Interactive camera controls
+- Mobile-friendly navigation
+- Route highlighting
 
 ---
 
-## GIS Data Layer
+## 2️⃣ GIS Data Layer
 
-Campus spatial data is stored as structured datasets.
-
-Example files:
+Campus spatial data is stored in structured datasets:
 
 ```
-
 src/data/mnnit_paths.json
 src/data/campusGraph.ts
 src/data/wifiAPs.ts
-
 ```
 
-These datasets contain:
+Data includes:
 
-- pathway networks
-- building nodes
-- WiFi access point locations
+- Path networks
+- Building coordinates
+- WiFi Access Point locations
 
 ---
 
-## Navigation Graph
-
-The campus pathway network is represented as a graph.
-
-```
-
-Nodes  -> Buildings / intersections
-Edges  -> Walkable paths
-
-```
-
-Example:
-
-```
-
-Gate --- Admin --- CSE --- Library
-
-```
-
----
-
-## Pathfinding Algorithm
-
-The navigation system uses the **A* pathfinding algorithm** implemented in:
-
-```
-
-src/navigation/astar.ts
-
-```
-
-The algorithm computes the optimal route using the heuristic function:
-
-```
-
-f(n) = g(n) + h(n)
-
-```
-
-Where:
-
-- g(n) = cost from start node
-- h(n) = estimated cost to goal
-
----
-
-## Graph Generation
-
-Campus navigation graphs are generated using:
-
-```
-
-src/navigation/graphGenerator.ts
-
-```
-
-Process:
-
-1. Load pathway dataset
-2. Detect intersections
-3. Create graph nodes
-4. Generate adjacency network
-
----
-
-## Smart Campus Positioning
-
-The system includes a **WiFi RSSI-based localization module**.
+## 3️⃣ A* Pathfinding Algorithm
 
 Implemented in:
 
 ```
-
-components/WifiScanner.tsx
-src/data/wifiAPs.ts
-
+src/navigation/astar.ts
 ```
 
-WiFi signal strengths from access points are used to estimate user location within the campus environment.
+The algorithm computes the shortest path using:
+
+```
+f(n) = g(n) + h(n)
+```
+
+Where:
+
+- g(n) → distance from start
+- h(n) → heuristic distance to goal
+
+The campus is modeled as a weighted graph for efficient routing.
 
 ---
 
-## Navigation Visualization
+## 4️⃣ Graph Generation
 
-Routes computed by the pathfinding algorithm are visualized inside the **3D campus environment**.
+Navigation graphs are automatically generated using:
 
-Users can:
+```
+src/navigation/graphGenerator.ts
+```
 
-- choose a destination
-- compute the shortest route
-- visualize navigation paths
+Process:
+
+1. Load GIS path dataset
+2. Identify intersections
+3. Create nodes
+4. Build adjacency network
 
 ---
 
-# Technology Stack
+## 5️⃣ Smart Campus Positioning
 
-| Layer | Technology |
-|------|-----------|
-Frontend | React + TypeScript |
-3D Visualization | Three.js |
-Navigation | A* Algorithm |
-GIS Data | JSON Spatial Data |
-Positioning | WiFi RSSI |
-Deployment | Vercel |
+WiFi RSSI-based localization is implemented using:
+
+```
+components/WifiScanner.tsx
+src/data/wifiAPs.ts
+```
+
+### WiFi Positioning Workflow
+
+```mermaid
+flowchart TD
+    A[User Device] --> B[Scan WiFi Signals]
+
+    B --> C[Collect RSSI Values]
+
+    C --> D[Access Point Database]
+
+    D --> E[Distance Estimation]
+
+    E --> F[Position Calculation]
+
+    F --> G[Update User Location in Navigation Engine]
+```
+
+This improves positioning accuracy in campus environments where GPS may be unreliable.
+
+---
+
+# Experimental Evaluation
+
+## Navigation Distance
+
+| Route | Distance |
+|-------|----------|
+Gate → Library | ~450 m |
+Gate → CSE | ~300 m |
+
+---
+
+## Localization Accuracy
+
+| Method | Approx Error |
+|--------|--------------|
+GPS | ~8 meters |
+WiFi RSSI | ~5 meters |
+Sensor Fusion | ~3 meters |
+
+---
+
+## System Performance
+
+| Metric | Value |
+|--------|-------|
+Frame Rate | ~60 FPS |
+Load Time | ~2–3 seconds |
+Routing Time | < 0.005 seconds |
 
 ---
 
 # Repository Structure
 
 ```
-
 GAMEMNNIT
 │
 ├── components
@@ -215,7 +260,6 @@ GAMEMNNIT
 ├── src
 │   ├── core
 │   │   ├── GISUtils.ts
-│   │   └── database connectors
 │   │
 │   ├── data
 │   │   ├── campusGraph.ts
@@ -232,61 +276,29 @@ GAMEMNNIT
 │   └── campus_map.jpg
 │
 └── package.json
-
 ```
-
----
-
-# Experimental Evaluation
-
-## Navigation Distance
-
-| Route | Distance |
-|------|----------|
-Gate → Library | ~450 m |
-Gate → CSE | ~300 m |
-
----
-
-## Localization Accuracy
-
-| Method | Approx Error |
-|------|---------------|
-GPS | ~8 meters |
-WiFi RSSI | ~5 meters |
-Fusion | ~3 meters |
-
----
-
-## System Performance
-
-| Metric | Value |
-|------|-------|
-FPS | ~60 |
-Load Time | ~2–3 seconds |
 
 ---
 
 # Applications
 
-This framework can be applied to:
+This framework can be extended to:
 
-- Smart campus navigation
-- Digital twin simulations
-- AR navigation research
-- Smart city navigation
-- Emergency evacuation planning
+- Smart Campus Navigation
+- Digital Twin Research
+- AR-Based Navigation Systems
+- Smart City Wayfinding
+- Emergency Evacuation Planning
 
 ---
 
 # Future Work
 
-Future improvements may include:
-
-- Augmented Reality navigation
-- GPS + WiFi sensor fusion
-- AI conversational navigation assistants
-- indoor navigation integration
+- Augmented Reality integration (ARCore / ARKit)
+- Real-time GPS + WiFi sensor fusion
+- AI-based conversational campus assistant
+- Indoor navigation expansion
+- Multi-campus scalability
 
 ---
 
@@ -294,11 +306,11 @@ Future improvements may include:
 
 Shivansh Kaushik  
 M.Tech – Geoinformatics  
-Motilal Nehru National Institute of Technology Allahabad
+Motilal Nehru National Institute of Technology Allahabad  
 
 Supervisor  
 Prof. Dharmendra Kumar Yadav  
-Department of Computer Science & Engineering
+Department of Computer Science & Engineering  
 
 ---
 
@@ -311,4 +323,3 @@ https://gamemnnit.vercel.app/
 # License
 
 This project is intended for academic and research purposes.
-```
