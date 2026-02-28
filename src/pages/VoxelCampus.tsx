@@ -219,7 +219,7 @@ export const VoxelCampus: React.FC<VoxelCampusProps> = ({ selectedBuildingId, on
             </Canvas>
 
             {/* UI Overlays */}
-            <div style={{ position: 'absolute', top: isMobile ? '10px' : '20px', left: isMobile ? '10px' : '20px', color: 'white', fontFamily: 'monospace', pointerEvents: 'none', width: isMobile ? 'calc(100% - 20px)' : '300px', zIndex: 10 }}>
+            <div style={{ position: 'absolute', top: isMobile ? '10px' : '20px', left: isMobile ? '10px' : '20px', color: 'white', fontFamily: 'monospace', pointerEvents: 'none', width: isMobile ? 'calc(100% - 20px)' : '300px', zIndex: 3000 }}>
                 <h1 style={{ margin: 0, fontSize: isMobile ? '16px' : '18px', letterSpacing: '2px', textShadow: '0 0 10px #00ff88' }}>🏛 MNNIT TWIN</h1>
                 <div style={{ pointerEvents: 'auto', marginTop: isMobile ? '10px' : '14px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                     {!user ? (
@@ -239,7 +239,7 @@ export const VoxelCampus: React.FC<VoxelCampusProps> = ({ selectedBuildingId, on
                 </div>
             </div>
 
-            <div style={{ position: 'absolute', top: isMobile ? '10px' : 'auto', bottom: isMobile ? 'auto' : '120px', right: isMobile ? '10px' : 'auto', left: isMobile ? 'auto' : '20px', pointerEvents: 'auto', transform: isMobile ? 'scale(0.8)' : 'none', transformOrigin: 'top right', zIndex: 11 }}>
+            <div style={{ position: 'absolute', top: isMobile ? '10px' : 'auto', bottom: isMobile ? 'auto' : '120px', right: isMobile ? '10px' : 'auto', left: isMobile ? 'auto' : '20px', pointerEvents: 'auto', transform: isMobile ? 'scale(0.8)' : 'none', transformOrigin: 'top right', zIndex: 3000 }}>
                 <Minimap userPos={[0, 0, 0]} buildings={buildings} destination={buildings.find(b => b.id === selectedBuildingId)?.name} />
             </div>
 
