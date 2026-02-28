@@ -1,47 +1,52 @@
-import React, { useRef } from 'react';
+import React, { useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
-import { PathNode } from '../core/Pathfinder';
 import * as THREE from 'three';
 
 interface PathRendererProps {
-    path: PathNode[];
+    path: { x: number; z: number }[];
 }
 
 /**
- * Renders a glowing green trail for the navigation path.
+ * Renders a smooth, glowing navigation path using a curve and tube geometry.
  */
 export const PathRenderer: React.FC<PathRendererProps> = ({ path }) => {
-    const groupRef = useRef<THREE.Group>(null);
+    const materialRef = useRef<THREE.MeshStandardMaterial>(null);
+
+    const curve = useMemo(() => {
+        if (!path || path.length < 2) return null;
+        const points = path.map(p => new THREE.Vector3(p.x, 0.2, p.z));
+        return new THREE.CatmullRomCurve3(points);
+    }, [path]);
 
     useFrame((state) => {
-        if (!groupRef.current) return;
-        const time = state.clock.getElapsedTime();
-        groupRef.current.children.forEach((child, i) => {
-            const mesh = child as THREE.Mesh;
-            const material = mesh.material as THREE.MeshBasicMaterial;
-            // Subtle pulse and wave effect
-            const offset = i * 0.1;
-            const pulse = Math.sin(time * 3 + offset) * 0.2 + 0.8;
-            material.opacity = pulse * 0.6;
-        });
+        if (materialRef.current) {
+            const time = state.clock.getElapsedTime();
+            materialRef.current.emissiveIntensity = 2 + Math.sin(time * 4) * 1.5;
+        }
     });
 
-    if (!path || path.length === 0) return null;
+    if (!curve) return null;
 
     return (
-        <group ref={groupRef}>
+        <group>
+            {/* The main glowing line */}
+            <mesh>
+                <tubeGeometry args={[curve, 64, 0.15, 8, false]} />
+                <meshStandardMaterial
+                    ref={materialRef}
+                    color="#00ff88"
+                    emissive="#00ff88"
+                    emissiveIntensity={2}
+                    transparent
+                    opacity={0.8}
+                />
+            </mesh>
+
+            {/* Markers at each node for better visibility */}
             {path.map((node, i) => (
-                <mesh
-                    key={`${node.x}-${node.z}-${i}`}
-                    position={[node.x + 0.5, 0.15, node.z + 0.5]}
-                >
-                    <boxGeometry args={[0.7, 0.08, 0.7]} />
-                    <meshBasicMaterial
-                        color="#00ff88"
-                        transparent
-                        opacity={0.6}
-                        depthWrite={false}
-                    />
+                <mesh key={`node-${i}`} position={[node.x, 0.2, node.z]}>
+                    <sphereGeometry args={[0.3, 16, 16]} />
+                    <meshStandardMaterial color="#00ff88" emissive="#00ff88" emissiveIntensity={1} />
                 </mesh>
             ))}
         </group>

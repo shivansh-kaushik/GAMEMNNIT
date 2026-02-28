@@ -98,7 +98,7 @@ export const MobileControls: React.FC<MobileControlsProps> = ({ onMove, onJump, 
     const btnStyle: React.CSSProperties = {
         width: '70px', height: '70px', borderRadius: '20px', display: 'flex', flexDirection: 'column',
         alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: '900',
-        backdropFilter: 'blur(10px)', boxShadow: '0 8px 15px rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)',
+        backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', boxShadow: '0 8px 15px rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)',
         cursor: 'pointer', outline: 'none'
     };
 
@@ -113,8 +113,8 @@ export const MobileControls: React.FC<MobileControlsProps> = ({ onMove, onJump, 
                 ref={joystickRef}
                 style={{
                     position: 'absolute', bottom: '40px', left: '40px', width: '130px', height: '130px',
-                    background: 'rgba(255,255,255,0.05)', borderRadius: '50%', border: '1px solid rgba(255,255,255,0.1)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(10px)'
+                    background: 'rgba(255,255,255,0.1)', borderRadius: '50%', border: '1px solid rgba(255,255,255,0.2)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)'
                 }}
                 onTouchStart={handleJoystickStart}
                 onTouchMove={handleJoystickMove}

@@ -1,0 +1,85 @@
+{
+    "type": "FeatureCollection",
+    "features": [
+        {
+            "type": "Feature",
+            "properties": {
+                "name": "Main Road"
+            },
+            "geometry": {
+                "type": "LineString",
+                "coordinates": [
+                    [
+                        81.864531,
+                        25.494901
+                    ],
+                    [
+                        81.864630,
+                        25.494720
+                    ],
+                    [
+                        81.864779,
+                        25.494677
+                    ]
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "name": "Admin Path"
+            },
+            "geometry": {
+                "type": "LineString",
+                "coordinates": [
+                    [
+                        81.864779,
+                        25.494677
+                    ],
+                    [
+                        81.864979,
+                        25.495127
+                    ]
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "name": "Academic Path"
+            },
+            "geometry": {
+                "type": "LineString",
+                "coordinates": [
+                    [
+                        81.864779,
+                        25.494677
+                    ],
+                    [
+                        81.865029,
+                        25.494542
+                    ]
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "name": "Library Path"
+            },
+            "geometry": {
+                "type": "LineString",
+                "coordinates": [
+                    [
+                        81.865029,
+                        25.494542
+                    ],
+                    [
+                        81.865279,
+                        25.494632
+                    ]
+                ]
+            }
+        }
+    ]
+}
