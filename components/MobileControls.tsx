@@ -5,9 +5,10 @@ interface MobileControlsProps {
     onMove: (x: number, y: number) => void;
     onLook: (dx: number, dy: number) => void;
     onVertical: (val: number) => void; // 1 for up, -1 for down, 0 for none
+    onSelectDestination?: (destination: string) => void;
 }
 
-const MobileControls: React.FC<MobileControlsProps> = ({ onMove, onLook, onVertical }) => {
+const MobileControls: React.FC<MobileControlsProps> = ({ onMove, onLook, onVertical, onSelectDestination }) => {
     // Joystick State
     const [stickPos, setStickPos] = useState({ x: 0, y: 0 });
     const [isDraggingStick, setIsDraggingStick] = useState(false);
@@ -73,6 +74,23 @@ const MobileControls: React.FC<MobileControlsProps> = ({ onMove, onLook, onVerti
 
     return (
         <div className="absolute inset-0 pointer-events-none z-50 flex flex-col justify-end pb-8 px-6 md:pb-12 md:px-12">
+
+            {/* Destination Selection UI */}
+            {onSelectDestination && (
+                <div className="absolute top-4 left-4 pointer-events-auto z-50">
+                    <select
+                        className="bg-slate-900/80 text-white text-sm p-2 rounded border border-slate-600 outline-none"
+                        onChange={(e) => onSelectDestination(e.target.value)}
+                    >
+                        <option value="">Select Destination...</option>
+                        <option value="Library">Library</option>
+                        <option value="CSE Department">CSE Department</option>
+                        <option value="Admin Block">Admin Block</option>
+                        <option value="Hostels">Hostels</option>
+                        <option value="Main Gate">Main Gate</option>
+                    </select>
+                </div>
+            )}
 
             {/* INVISIBLE FULL SCREEN LOOK AREA (Right Half) */}
             <div

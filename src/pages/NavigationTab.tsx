@@ -1,14 +1,31 @@
 import React, { useState } from 'react';
 import { CAMPUS_BUILDINGS } from '../navigation/buildings';
 
+import { TransportMode, TransportSelector } from '../components/TransportSelector';
+
 interface NavigationTabProps {
     selectedBuildingId: string | null;
     onSelectBuilding: (id: string | null) => void;
     setActiveTab: (tab: string) => void;
+    transportMode: TransportMode;
+    setTransportMode: (mode: TransportMode) => void;
 }
 
-export const NavigationTab: React.FC<NavigationTabProps> = ({ selectedBuildingId, onSelectBuilding, setActiveTab }) => {
+export const NavigationTab: React.FC<NavigationTabProps> = ({ selectedBuildingId, onSelectBuilding, setActiveTab, transportMode, setTransportMode }) => {
     const [origin, setOrigin] = useState('My Location');
+
+    // Mocks for now, can be replaced by actual path distance later if mapped
+    const distanceMeters = selectedBuildingId ? 240 : 0; // Mock distance
+
+    const speeds = {
+        walk: 1.4,
+        cycle: 5.0,
+        car: 10.0
+    };
+
+    const speed = speeds[transportMode] || 1.4;
+    const estimatedSeconds = distanceMeters / speed;
+    const estimatedMins = Math.max(1, Math.round(estimatedSeconds / 60));
 
     return (
         <div style={{ width: '100vw', height: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', background: '#0a0a0a', padding: '60px 20px' }}>
@@ -49,11 +66,17 @@ export const NavigationTab: React.FC<NavigationTabProps> = ({ selectedBuildingId
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                 <span style={{ color: '#aaa', fontSize: '14px' }}>ESTIMATED TIME:</span>
-                                <span style={{ color: '#00ff88', fontSize: '18px', fontWeight: 'bold' }}>3 mins</span>
+                                <span style={{ color: '#00ff88', fontSize: '18px', fontWeight: 'bold' }}>{estimatedMins} min{estimatedMins > 1 ? 's' : ''}</span>
                             </div>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                 <span style={{ color: '#aaa', fontSize: '14px' }}>DISTANCE:</span>
                                 <span style={{ color: '#fff', fontSize: '18px' }}>240 meters</span>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <span style={{ color: '#aaa', fontSize: '14px' }}>MODE:</span>
+                                <div style={{ width: '150px' }}>
+                                    <TransportSelector mode={transportMode} onModeChange={setTransportMode} />
+                                </div>
                             </div>
                             <button
                                 onClick={() => setActiveTab('voxel')}

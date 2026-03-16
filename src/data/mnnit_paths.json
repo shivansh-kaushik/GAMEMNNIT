@@ -80,6 +80,63 @@
                     ]
                 ]
             }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "name": "Science Block Path"
+            },
+            "geometry": {
+                "type": "LineString",
+                "coordinates": [
+                    [
+                        81.865279,
+                        25.494632
+                    ],
+                    [
+                        81.866500,
+                        25.493200
+                    ]
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "name": "Engineering Block Path"
+            },
+            "geometry": {
+                "type": "LineString",
+                "coordinates": [
+                    [
+                        81.866500,
+                        25.493200
+                    ],
+                    [
+                        81.866000,
+                        25.491800
+                    ]
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "name": "Management Path"
+            },
+            "geometry": {
+                "type": "LineString",
+                "coordinates": [
+                    [
+                        81.866500,
+                        25.493200
+                    ],
+                    [
+                        81.865000,
+                        25.494000
+                    ]
+                ]
+            }
         }
     ]
 }

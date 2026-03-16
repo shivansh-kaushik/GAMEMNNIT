@@ -7,10 +7,11 @@ interface TabsProps {
 
 const TABS = [
     { id: 'voxel', label: '🧱 VOXEL CAMPUS', icon: '🏰' },
-    { id: 'map', label: '🗺 REAL MAP', icon: '🌍' },
-    { id: 'nav', label: '📍 NAVIGATION', icon: '🧭' },
+    { id: 'map', label: '🗺 REAL MAP (AUTO GENERATED)', icon: '🌍' },
     { id: 'gps', label: '📡 GPS', icon: '📍' },
     { id: 'wifi', label: '📶 WIFI RSSI', icon: '📡' },
+    { id: 'ar', label: '📷 AR NAVIGATION', icon: '📷' },
+    { id: 'thesis', label: '🎓 THESIS', icon: '📜' },
 ];
 
 export const Tabs: React.FC<TabsProps> = ({ activeTab, onTabChange }) => {

@@ -6,92 +6,76 @@ interface AdminBuildingProps {
     position: [number, number, number];
     size?: [number, number, number]; // [width, height, depth]
     name?: string;
+    rotation?: [number, number, number];
 }
 
 const BOX_GEOMETRY = new THREE.BoxGeometry(1, 1, 1);
 
-// Materials based on the sandstone/desert look in the photo
-const SANDSTONE_MATERIAL = new THREE.MeshStandardMaterial({ color: '#d9b38c', roughness: 0.8 });
-const SANDSTONE_DARK = new THREE.MeshStandardMaterial({ color: '#b38659', roughness: 0.6 });
-const PURPLE_BANNER = new THREE.MeshStandardMaterial({ color: '#5b21b6', roughness: 0.5 });
-const PORCH_WHITE = new THREE.MeshStandardMaterial({ color: '#f8fafc', roughness: 0.3 });
-const WINDOW_GLASS = new THREE.MeshStandardMaterial({ color: '#93c5fd', transparent: true, opacity: 0.5, metalness: 0.9 });
-const FLOOR_MATERIAL = new THREE.MeshStandardMaterial({ color: '#94a3b8' });
+// Materials matching the drone footage
+const FACADE_MATERIAL = new THREE.MeshStandardMaterial({ color: '#e5c9b3', roughness: 0.8 }); // Similar tone to academic
+const ROOF_GREY = new THREE.MeshStandardMaterial({ color: '#94a3b8', roughness: 0.7 });
+const WINDOW_GLASS = new THREE.MeshStandardMaterial({ color: '#334155', roughness: 0.3 }); // Dark windows
+const PATH_MATERIAL = new THREE.MeshStandardMaterial({ color: '#f8fafc', roughness: 0.3 });
+const ACCENT_MATERIAL = new THREE.MeshStandardMaterial({ color: '#b38659', roughness: 0.6 });
+const GRASS_MATERIAL = new THREE.MeshStandardMaterial({ color: '#4ade80', roughness: 0.9 });
 
 export const AdminBuilding: React.FC<AdminBuildingProps> = ({
     position,
     size = [50, 16, 25],
-    name = "ADMINISTRATIVE BUILDING"
+    name = "ADMINISTRATIVE BLOCK",
+    rotation = [0, 0, 0]
 }) => {
     const [width, height, depth] = size;
 
     const voxelData = useMemo(() => {
-        const voxels: { pos: THREE.Vector3, type: 'sandstone' | 'sandstone_dark' | 'purple' | 'porch' | 'glass' | 'floor' }[] = [];
+        const voxels: { pos: THREE.Vector3, type: 'wall' | 'roof' | 'glass' | 'path' | 'accent' | 'grass' }[] = [];
 
-        const centerX = width / 2;
-        const radius = 12;
-        const wingWidth = (width - radius * 2) / 2;
+        const centerX = Math.floor(width / 2);
+        const radius = 14;
+        const innerRadius = 8;
+
+        // Position the semi-circle center so it curves towards the front (high z)
+        const curveCenterZ = depth - radius - 2;
 
         for (let y = 0; y < height; y++) {
-            const isFloorBase = y % 4 === 0;
-
             for (let x = 0; x < width; x++) {
                 for (let z = 0; z < depth; z++) {
-                    const isOuterWall = x === 0 || x === width - 1 || z === depth - 1;
-
-                    // Central Curved Section
                     const dx = x - centerX;
-                    const dz = z - 2; // Offset curve from front
+
+                    // Main curved block
+                    const dz = z - curveCenterZ;
                     const distToCenter = Math.sqrt(dx * dx + dz * dz);
-                    const isCurve = Math.abs(distToCenter - radius) < 1 && dz >= 0 && z < radius + 2;
-                    const isCurveFill = distToCenter < radius && dz >= 0 && z < radius + 2;
 
-                    // Wings
-                    const isRightWing = x > centerX + radius;
-                    const isLeftWing = x < centerX - radius;
-                    const isWing = (isLeftWing || isRightWing) && z < 15;
+                    // Top half of circle facing front (+z)
+                    const isCurveWall = distToCenter <= radius && distToCenter >= innerRadius && z >= curveCenterZ;
 
-                    // Building Logic
-                    if (isFloorBase && (isCurveFill || isWing)) {
-                        voxels.push({ pos: new THREE.Vector3(x, y, z), type: 'floor' });
-                    }
+                    // Two straight wings extending to the back (-z)
+                    const isLeftWing = x >= centerX - radius - 2 && x <= centerX - radius + 2 && z < curveCenterZ && z > 2;
+                    const isRightWing = x >= centerX + radius - 2 && x <= centerX + radius + 2 && z < curveCenterZ && z > 2;
 
-                    // Central Curved Facade
-                    if (isCurve) {
-                        const isBannerArea = y >= 6 && y <= 8 && Math.abs(dx) < 6;
-                        const isPorchEntry = y < 3 && Math.abs(dx) < 3;
+                    const isBuilding = isCurveWall || isLeftWing || isRightWing;
 
-                        if (isBannerArea) {
-                            voxels.push({ pos: new THREE.Vector3(x, y, z), type: 'purple' });
-                        } else if (isPorchEntry) {
-                            // Leave gap for entry
-                            continue;
+                    if (isBuilding) {
+                        const isRoof = y === height - 1;
+                        if (isRoof) {
+                            voxels.push({ pos: new THREE.Vector3(x, y, z), type: 'roof' });
                         } else {
-                            const isWindow = (y % 4 > 1) && (Math.abs(dx) % 3 !== 0);
-                            voxels.push({ pos: new THREE.Vector3(x, y, z), type: isWindow ? 'glass' : 'sandstone' });
-                        }
-                        continue;
-                    }
+                            // Windows logic
+                            const isOuter = distToCenter >= radius - 1 || distToCenter <= innerRadius + 1;
+                            const isWindowPattern = isOuter && (x % 3 === 0) && (y % 4 === 2 || y % 4 === 3);
 
-                    // Side Wings Facade
-                    if (isWing) {
-                        const isWingFront = z === 0;
-                        const isWingSide = x === 0 || x === width - 1;
-                        const isWingBack = z === 15;
+                            // Central entrance facing +z
+                            const isEntrance = Math.abs(dx) < 3 && z > depth - 6 && y < 4;
 
-                        if (isWingFront || isWingSide || isWingBack) {
-                            // Varied heights for wings
-                            const maxWingHeight = isLeftWing ? 12 : 14;
-                            if (y < maxWingHeight) {
-                                const isWindow = (x % 5 === 0 || x % 5 === 1) && (y % 4 > 1);
-                                voxels.push({ pos: new THREE.Vector3(x, y, z), type: isWindow ? 'glass' : 'sandstone_dark' });
+                            if (isEntrance) {
+                                if (y === 0) voxels.push({ pos: new THREE.Vector3(x, y, z), type: 'path' });
+                            } else {
+                                voxels.push({ pos: new THREE.Vector3(x, y, z), type: isWindowPattern ? 'glass' : 'wall' });
                             }
                         }
-                    }
-
-                    // Porch at base of curve
-                    if (y === 0 && Math.abs(dx) < radius && z < 4) {
-                        voxels.push({ pos: new THREE.Vector3(x, y, z), type: 'porch' });
+                    } else if (y === 0 && z < curveCenterZ && Math.abs(dx) < radius - 2) {
+                        // Fill courtyard with grass behind the curve
+                        voxels.push({ pos: new THREE.Vector3(x, y, z), type: 'grass' });
                     }
                 }
             }
@@ -100,17 +84,17 @@ export const AdminBuilding: React.FC<AdminBuildingProps> = ({
     }, [width, height, depth]);
 
     const materials = {
-        sandstone: SANDSTONE_MATERIAL,
-        sandstone_dark: SANDSTONE_DARK,
-        purple: PURPLE_BANNER,
-        porch: PORCH_WHITE,
+        wall: FACADE_MATERIAL,
+        roof: ROOF_GREY,
         glass: WINDOW_GLASS,
-        floor: FLOOR_MATERIAL
+        path: PATH_MATERIAL,
+        accent: ACCENT_MATERIAL,
+        grass: GRASS_MATERIAL
     };
 
     return (
-        <group position={position}>
-            {Object.keys(materials).map((type) => {
+        <group position={position} rotation={rotation}>
+            {['wall', 'roof', 'glass', 'path', 'accent', 'grass'].map((type) => {
                 const typeVoxels = voxelData.filter(v => v.type === type);
                 if (typeVoxels.length === 0) return null;
                 return (
@@ -124,31 +108,27 @@ export const AdminBuilding: React.FC<AdminBuildingProps> = ({
 
             {name && (
                 <Html
-                    position={[width / 2, height + 2, 0]}
+                    position={[width / 2, height + 4, depth]}
                     center
                     distanceFactor={20}
                     style={{
                         pointerEvents: 'none',
                         color: 'white',
-                        background: '#5b21b6',
-                        padding: '2px 10px',
-                        borderRadius: '2px',
-                        fontSize: '12px',
+                        background: 'rgba(0,0,0,0.8)',
+                        padding: '4px 12px',
+                        borderRadius: '4px',
+                        fontSize: '14px',
                         fontWeight: 'bold',
                         textAlign: 'center',
-                        boxShadow: '0 0 10px rgba(91, 33, 182, 0.5)'
+                        border: '2px solid rgba(255,255,255,0.4)'
                     }}
                 >
                     {name}
                 </Html>
             )}
 
-            {/* Office Labels */}
-            <Html position={[10, 6, 5]} center distanceFactor={12}>
-                <div style={{ color: '#fff', background: 'rgba(128,0,128,0.6)', padding: '3px 7px', borderRadius: '4px', fontSize: '10px', fontWeight: 'bold' }}>REGISTRAR OFFICE</div>
-            </Html>
-            <Html position={[40, 6, 5]} center distanceFactor={12}>
-                <div style={{ color: '#fff', background: 'rgba(128,0,128,0.6)', padding: '3px 7px', borderRadius: '4px', fontSize: '10px', fontWeight: 'bold' }}>DIRECTOR'S OFFICE</div>
+            <Html position={[width / 2, 6, depth - 2]} center distanceFactor={15}>
+                <div style={{ color: '#fff', background: 'rgba(50,50,50,0.6)', padding: '3px 7px', borderRadius: '4px', fontSize: '10px', fontWeight: 'bold' }}>MAIN OFFICE</div>
             </Html>
         </group>
     );

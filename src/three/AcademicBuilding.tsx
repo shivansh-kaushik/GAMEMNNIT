@@ -5,137 +5,140 @@ import { Html } from '@react-three/drei';
 interface AcademicBuildingProps {
     position: [number, number, number];
     size?: [number, number, number]; // [width, height, depth]
-    color?: string;
     name?: string;
+    rotation?: [number, number, number];
 }
 
 const BOX_GEOMETRY = new THREE.BoxGeometry(1, 1, 1);
 
-// Materials
-const FACADE_MAROON = new THREE.MeshStandardMaterial({ color: '#742a2a', roughness: 0.4 }); // Central block
-const FACADE_BEIGE = new THREE.MeshStandardMaterial({ color: '#fef3c7', roughness: 0.7 });  // Side wings
-const PORCH_WHITE = new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.5 });   // Entrance porch
-const FLOOR_MATERIAL = new THREE.MeshStandardMaterial({ color: '#94a3b8', roughness: 0.8 });
-const GLASS_MATERIAL = new THREE.MeshStandardMaterial({ color: '#93c5fd', transparent: true, opacity: 0.4, metalness: 0.8 });
-const GRASS_MATERIAL = new THREE.MeshStandardMaterial({ color: '#22c55e', roughness: 0.9 });
-const STAIRS_MATERIAL = new THREE.MeshStandardMaterial({ color: '#64748b', metalness: 0.5 });
-const WALL_MATERIAL = new THREE.MeshStandardMaterial({ color: '#cbd5e1', roughness: 0.6 }); // Retained for internal walls
+// Materials matching the drone footage
+const FACADE_BEIGE = new THREE.MeshStandardMaterial({ color: '#e5c9b3', roughness: 0.8 }); // Pinkish/beige tone
+const ROOF_GREY = new THREE.MeshStandardMaterial({ color: '#94a3b8', roughness: 0.7 });
+const GRASS_MATERIAL = new THREE.MeshStandardMaterial({ color: '#4ade80', roughness: 0.9 });
+const GLASS_MATERIAL = new THREE.MeshStandardMaterial({ color: '#334155', roughness: 0.3 }); // Dark windows
+const PATH_MATERIAL = new THREE.MeshStandardMaterial({ color: '#e2e8f0', roughness: 0.6 });
+const BRICK_MATERIAL = new THREE.MeshStandardMaterial({ color: '#7f1d1d', roughness: 0.8 }); // Red central tower
+const FIN_MATERIAL = new THREE.MeshStandardMaterial({ color: '#f1f5f9', roughness: 0.4 }); // White vertical fins
 
 export const AcademicBuilding: React.FC<AcademicBuildingProps> = ({
     position,
-    size = [40, 12, 30], // Default size for the detailed model
-    name = "ACADEMIC BUILDING"
+    size = [40, 12, 30],
+    name = "ACADEMIC BUILDING",
+    rotation = [0, 0, 0]
 }) => {
-    const meshRef = useRef<THREE.InstancedMesh>(null);
     const [width, height, depth] = size;
+    const midX = Math.floor(width / 2);
 
     // Define the voxel structure
     const voxelData = useMemo(() => {
-        const voxels: { pos: THREE.Vector3, type: 'wall' | 'floor' | 'glass' | 'grass' | 'stairs' | 'maroon' | 'porch' | 'beige' }[] = [];
+        const voxels: { pos: THREE.Vector3, type: 'wall' | 'roof' | 'glass' | 'grass' | 'path' | 'floor' | 'brick' | 'fin' }[] = [];
 
+        // Building Dimensions Reference: [210, 12, 170]
+        const wallThickness = 2;
         const floorHeight = 4;
-        const centerX = Math.floor(width / 2);
-        const centralBlockWidth = 10;
-        const porchHeight = 2;
+
+        const midZ = Math.floor(depth / 2);
+        const towerWidthZ = 40; // Tower in center
+        const towerProtrusion = 4;
+
+        // Horizontal corridors (West-East)
+        const corridor1Z = 50;
+        const corridor2Z = 120;
+        const corridorWidth = 6;
+
+        // Vertical corridor (interconnect)
+        const verticalCorridorWidth = 6;
 
         for (let y = 0; y < height; y++) {
-            const isFloorBase = y % floorHeight === 0;
+            const isFloorSlab = y === 0 || y === 4 || y === 8;
+            const isRoofSlab = y === height - 1;
+            const isTowerY = y < height + 4; // Central tower can be taller
 
             for (let x = 0; x < width; x++) {
                 for (let z = 0; z < depth; z++) {
-                    const isOuterWall = x === 0 || x === width - 1 || z === 0 || z === depth - 1;
-                    const isFrontWall = z === 0;
+                    // 1. Exterior Shell
+                    const isNorthWall = z < wallThickness;
+                    const isSouthWall = z >= depth - wallThickness;
+                    const isWestWall = x < wallThickness;
+                    const isEastWall = x >= width - wallThickness;
+                    const isOuterWall = isNorthWall || isSouthWall || isWestWall || isEastWall;
 
-                    // Central Block Region
-                    const isCentralX = x >= centerX - centralBlockWidth / 2 && x <= centerX + centralBlockWidth / 2;
-                    const isCentralBlock = isCentralX && isFrontWall;
-                    const isPorchArea = isCentralX && z === 0 && y < porchHeight;
+                    // Central Tower Logic (Brick)
+                    const isTowerZ = z >= midZ - towerWidthZ / 2 && z < midZ + towerWidthZ / 2;
+                    const isTowerX = (x < wallThickness + towerProtrusion && x >= 0);
+                    const isCentralTower = isTowerZ && isTowerX && isWestWall;
 
-                    // Gardens (3 internal gardens)
-                    const isGarden1 = x > 8 && x < 15 && z > 10 && z < 18;
-                    const isGarden2 = x > 25 && x < 32 && z > 10 && z < 18;
-                    const isGarden3 = x > 15 && x < 25 && z > 20 && z < 27;
-                    const isGarden = isGarden1 || isGarden2 || isGarden3;
+                    // Library Section Logic (SE corner for vertical fins)
+                    const isLibraryArea = x >= width - wallThickness && z > corridor2Z;
 
-                    // Circular Stairs
-                    const distToStairs = Math.sqrt(Math.pow(x - 15, 2) + Math.pow(z - 18, 2));
-                    const isStairs = distToStairs < 2 && !isFloorBase;
+                    // 2. Corridors
+                    const isInHorizCorridor = (z >= corridor1Z && z < corridor1Z + corridorWidth) ||
+                        (z >= corridor2Z && z < corridor2Z + corridorWidth);
+                    const isInVertCorridor = (x >= midX - verticalCorridorWidth / 2 && x < midX + verticalCorridorWidth / 2);
+                    const isInAnyCorridor = isInHorizCorridor || isInVertCorridor;
 
-                    if (isGarden) {
-                        if (y === 0) voxels.push({ pos: new THREE.Vector3(x, y, z), type: 'grass' });
-                        continue;
-                    }
+                    // Gate Locations
+                    // Front (West, x=0)
+                    const isMainGate = x < 2 && z > midZ - 5 && z < midZ + 5 && y < 4; // Main gate center
+                    const isFrontSecGate = x < 2 && z > 20 && z < 30 && y < 4; // Front secondary (North)
 
-                    if (isFloorBase && !isPorchArea) {
+                    // Back (East, x=width)
+                    const isBackSecGate = x >= width - 2 && z > 20 && z < 30 && y < 4; // Back secondary (North)
+                    const isLibraryGate = x >= width - 2 && z > depth - 30 && z < depth - 20 && y < 4; // Library gate (South)
+
+                    const isAnyGate = isMainGate || isFrontSecGate || isBackSecGate || isLibraryGate;
+
+                    if (isRoofSlab || (isTowerY && isCentralTower && y >= height - 1)) {
+                        if (isOuterWall || x % 20 === 0 || z % 20 === 0 || isCentralTower) {
+                            voxels.push({ pos: new THREE.Vector3(x, y, z), type: 'roof' });
+                        }
+                    } else if (isFloorSlab) {
                         voxels.push({ pos: new THREE.Vector3(x, y, z), type: 'floor' });
-                    }
-
-                    // Porch logic
-                    if (isPorchArea) {
-                        const isMainEntryWay = x > centerX - 2 && x < centerX + 2 && y < 3;
-                        if (!isMainEntryWay || y === porchHeight - 1) {
-                            voxels.push({ pos: new THREE.Vector3(x, y, z), type: 'porch' });
-                        }
-                        continue;
-                    }
-
-                    if (isOuterWall) {
-                        if (isCentralBlock) {
-                            // The central maroon block is taller
-                            const isTallSection = y < height + 4; // Extend height for central block
-                            if (isTallSection) {
-                                voxels.push({ pos: new THREE.Vector3(x, y, z), type: 'maroon' });
-                            }
+                    } else if (isOuterWall) {
+                        if (isAnyGate) {
+                            if (y === 0) voxels.push({ pos: new THREE.Vector3(x, y, z), type: 'path' });
+                        } else if (isCentralTower) {
+                            voxels.push({ pos: new THREE.Vector3(x, y, z), type: 'brick' });
+                        } else if (isLibraryArea && x === width - 1 && z % 4 === 0) {
+                            // Vertical fins for library facade
+                            voxels.push({ pos: new THREE.Vector3(x, y, z), type: 'fin' });
                         } else {
-                            // Side wings (beige/yellow)
-                            const isWindow = (x % 4 === 0 || x % 4 === 1) && (y % floorHeight > 1);
-                            voxels.push({ pos: new THREE.Vector3(x, y, z), type: isWindow ? 'glass' : 'beige' });
-                        }
-                    } else if (isStairs) {
-                        const angle = (y * Math.PI) / 2;
-                        const sx = Math.round(15 + Math.cos(angle) * 1.2);
-                        const sz = Math.round(18 + Math.sin(angle) * 1.2);
-                        if (x === sx && z === sz) {
-                            voxels.push({ pos: new THREE.Vector3(x, y, z), type: 'stairs' });
+                            // Windows pattern
+                            const isWindowSpace = (x % 6 === 0 || z % 6 === 0) && (y % floorHeight >= 2);
+                            voxels.push({ pos: new THREE.Vector3(x, y, z), type: isWindowSpace ? 'glass' : 'wall' });
                         }
                     } else {
-                        // Internal walls (simplified)
-                        const isCorridor = z === 8 || z === 18;
-                        if (isCorridor && y % floorHeight !== 0) {
+                        // Internal Walls
+                        const isInteriorWall =
+                            (Math.abs(z - corridor1Z) < 1) || (Math.abs(z - (corridor1Z + corridorWidth)) < 1) ||
+                            (Math.abs(z - corridor2Z) < 1) || (Math.abs(z - (corridor2Z + corridorWidth)) < 1) ||
+                            (Math.abs(x - midX) < 1);
+
+                        if (isInteriorWall && !isInAnyCorridor) {
                             voxels.push({ pos: new THREE.Vector3(x, y, z), type: 'wall' });
                         }
                     }
                 }
             }
         }
-        return voxels;
-    }, [width, height, depth]);
 
-    // Materials map
+        return voxels;
+    }, [width, height, depth, midX]);
+
     const materials = useMemo(() => ({
-        wall: WALL_MATERIAL,
-        floor: FLOOR_MATERIAL,
+        wall: FACADE_BEIGE,
+        roof: ROOF_GREY,
         glass: GLASS_MATERIAL,
         grass: GRASS_MATERIAL,
-        stairs: STAIRS_MATERIAL,
-        maroon: FACADE_MAROON,
-        porch: PORCH_WHITE,
-        beige: FACADE_BEIGE
+        path: PATH_MATERIAL,
+        floor: new THREE.MeshStandardMaterial({ color: '#cbd5e1', roughness: 0.5 }),
+        brick: BRICK_MATERIAL,
+        fin: FIN_MATERIAL
     }), []);
 
-    useLayoutEffect(() => {
-        if (!meshRef.current) return;
-
-        // Note: For multi-material instanced mesh, usually you'd need multiple meshes.
-        // But for voxels, we can also use groups or just focus on the main structure.
-        // To keep it clean and performant, I'll use a single material for now OR
-        // just draw the walls and floor as main.
-    }, []);
-
     return (
-        <group position={position}>
-            {/* We'll use multiple instanced meshes for different materials to get the look right */}
-            {['wall', 'floor', 'glass', 'grass', 'stairs', 'maroon', 'porch', 'beige'].map((type) => {
+        <group position={position} rotation={rotation}>
+            {['wall', 'roof', 'glass', 'grass', 'path', 'floor', 'brick', 'fin'].map((type) => {
                 const typeVoxels = voxelData.filter(v => v.type === type);
                 if (typeVoxels.length === 0) return null;
 
@@ -150,18 +153,18 @@ export const AcademicBuilding: React.FC<AcademicBuildingProps> = ({
 
             {name && (
                 <Html
-                    position={[width / 2, height + 2, depth / 2]}
+                    position={[width / 2, height + 3, 0]}
                     center
                     distanceFactor={20}
                     style={{
                         pointerEvents: 'none',
-                        color: '#00ff88',
+                        color: '#ffffff',
                         background: 'rgba(0,0,0,0.8)',
                         padding: '4px 12px',
                         borderRadius: '4px',
                         fontSize: '14px',
                         fontWeight: 'bold',
-                        border: '2px solid #00ff88',
+                        border: '2px solid rgba(255,255,255,0.4)',
                         textTransform: 'uppercase',
                         letterSpacing: '1px'
                     }}
@@ -170,24 +173,52 @@ export const AcademicBuilding: React.FC<AcademicBuildingProps> = ({
                 </Html>
             )}
 
-            {/* Internal Floor Labels */}
-            <Html position={[8, 2, 8]} center distanceFactor={15}>
-                <div style={{ color: '#aaa', background: 'rgba(0,0,0,0.5)', padding: '2px 6px', borderRadius: '3px', fontSize: '10px' }}>MECHANICAL DEPT (GF)</div>
+            {/* Department Labels - Interior Positioning */}
+            <Html position={[midX / 2, 2, 25]} center distanceFactor={15}>
+                <div style={labelStyle}>MATH / MECH DEPT</div>
             </Html>
-            <Html position={[32, 2, 8]} center distanceFactor={15}>
-                <div style={{ color: '#aaa', background: 'rgba(0,0,0,0.5)', padding: '2px 6px', borderRadius: '3px', fontSize: '10px' }}>ELECTRICAL DEPT (GF)</div>
+            <Html position={[midX + midX / 2, 2, 25]} center distanceFactor={15}>
+                <div style={labelStyle}>ELECTRICAL DEPT</div>
             </Html>
-            <Html position={[8, 6, 18]} center distanceFactor={15}>
-                <div style={{ color: '#aaa', background: 'rgba(0,0,0,0.5)', padding: '2px 6px', borderRadius: '3px', fontSize: '10px' }}>BIOTECH DEPT (1F)</div>
+            <Html position={[30, 2, 85]} center distanceFactor={15}>
+                <div style={labelStyle}>BIOMEDICAL LAB</div>
             </Html>
-            <Html position={[32, 6, 18]} center distanceFactor={15}>
-                <div style={{ color: '#aaa', background: 'rgba(0,0,0,0.5)', padding: '2px 6px', borderRadius: '3px', fontSize: '10px' }}>MATH DEPT (1F)</div>
+            <Html position={[midX, 2, 85]} center distanceFactor={15}>
+                <div style={labelStyle}>STAIRS (FLR 0-2)</div>
             </Html>
-            <Html position={[Math.floor(width / 2), 10, 15]} center distanceFactor={15}>
-                <div style={{ color: '#00ff88', background: 'rgba(0,0,0,0.7)', padding: '4px 8px', borderRadius: '4px', border: '1px solid #00ff88', fontSize: '12px', fontWeight: 'bold' }}>CENTRAL LIBRARY (2F)</div>
+            <Html position={[midX / 2, 2, 145]} center distanceFactor={15}>
+                <div style={labelStyle}>BIOTECH DEPT</div>
+            </Html>
+            <Html position={[midX + midX / 2, 2, 145]} center distanceFactor={15}>
+                <div style={labelStyle}>CENTRAL LIBRARY</div>
+            </Html>
+
+            {/* Gate Labels */}
+            <Html position={[0, 2, depth / 2]} center distanceFactor={10}>
+                <div style={{ ...labelStyle, background: '#ef4444' }}>MAIN GATE (FRONT)</div>
+            </Html>
+            <Html position={[0, 2, 25]} center distanceFactor={10}>
+                <div style={{ ...labelStyle, background: '#3b82f6' }}>FRONT SECONDARY GATE</div>
+            </Html>
+            <Html position={[width, 2, 25]} center distanceFactor={10}>
+                <div style={{ ...labelStyle, background: '#3b82f6' }}>BACK GATE (NORTH)</div>
+            </Html>
+            <Html position={[width, 2, depth - 25]} center distanceFactor={10}>
+                <div style={{ ...labelStyle, background: '#ef4444' }}>LIBRARY GATE (BACK)</div>
             </Html>
         </group>
     );
+};
+
+const labelStyle: React.CSSProperties = {
+    color: '#fff',
+    background: 'rgba(0,0,0,0.7)',
+    padding: '3px 8px',
+    borderRadius: '4px',
+    fontSize: '10px',
+    fontWeight: 'bold',
+    whiteSpace: 'nowrap',
+    border: '1px solid rgba(255,255,255,0.2)'
 };
 
 interface InstancedSubMeshProps {
@@ -213,3 +244,4 @@ const InstancedSubMesh: React.FC<InstancedSubMeshProps> = ({ voxels, material })
         <instancedMesh ref={meshRef} args={[BOX_GEOMETRY, material, voxels.length]} castShadow receiveShadow />
     );
 };
+

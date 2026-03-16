@@ -6,6 +6,7 @@ import { CAMPUS_BUILDINGS } from '../constants';
 
 interface CampusEnvironmentProps {
     targetBuildingId?: string;
+    userPosition?: [number, number, number] | null;
 }
 
 const Tree: React.FC<{ position: [number, number, number] }> = ({ position }) => (
@@ -19,7 +20,7 @@ const Tree: React.FC<{ position: [number, number, number] }> = ({ position }) =>
     </group>
 );
 
-const CampusEnvironment: React.FC<CampusEnvironmentProps> = ({ targetBuildingId }) => {
+const CampusEnvironment: React.FC<CampusEnvironmentProps> = ({ targetBuildingId, userPosition }) => {
     // Texture loading was causing issues. Using procedural grid for now.
 
     const treePositions = useMemo(() => {
@@ -74,6 +75,14 @@ const CampusEnvironment: React.FC<CampusEnvironmentProps> = ({ targetBuildingId 
 
             {/* Trees */}
             {treePositions.map((pos, i) => <Tree key={i} position={pos} />)}
+
+            {/* User Position Marker */}
+            {userPosition && (
+                <mesh position={userPosition}>
+                    <sphereGeometry args={[1.5, 32, 32]} />
+                    <meshBasicMaterial color="#ff0000" />
+                </mesh>
+            )}
         </>
     );
 };

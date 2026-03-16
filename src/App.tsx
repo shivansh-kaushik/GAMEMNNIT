@@ -4,22 +4,25 @@ import { Tabs } from './components/Tabs';
 // Lazy load pages for performance
 const VoxelCampus = lazy(() => import('./pages/VoxelCampus').then(m => ({ default: m.VoxelCampus })));
 const RealMap = lazy(() => import('./pages/RealMap').then(m => ({ default: m.RealMap })));
-const NavigationTab = lazy(() => import('./pages/NavigationTab').then(m => ({ default: m.NavigationTab })));
 const GPSTab = lazy(() => import('./pages/GPSTab').then(m => ({ default: m.GPSTab })));
 const WifiTab = lazy(() => import('./pages/WifiTab').then(m => ({ default: m.WifiTab })));
+const ARPage = lazy(() => import('./pages/ARPage').then(m => ({ default: m.ARPage })));
+const ThesisTab = lazy(() => import('./pages/ThesisTab').then(m => ({ default: m.ThesisTab })));
 
 const App: React.FC = () => {
     const [activeTab, setActiveTab] = useState('voxel');
     const [selectedBuildingId, setSelectedBuildingId] = useState<string | null>(null);
+    const [transportMode, setTransportMode] = useState<'walk' | 'cycle' | 'car'>('walk');
 
     const renderTab = () => {
         switch (activeTab) {
-            case 'voxel': return <VoxelCampus selectedBuildingId={selectedBuildingId} onSelectBuilding={setSelectedBuildingId} />;
-            case 'map': return <RealMap selectedBuildingId={selectedBuildingId} onSelectBuilding={setSelectedBuildingId} />;
-            case 'nav': return <NavigationTab selectedBuildingId={selectedBuildingId} onSelectBuilding={setSelectedBuildingId} setActiveTab={setActiveTab} />;
+            case 'voxel': return <VoxelCampus selectedBuildingId={selectedBuildingId} onSelectBuilding={setSelectedBuildingId} transportMode={transportMode} onTransportModeChange={setTransportMode} />;
+            case 'map': return <RealMap selectedBuildingId={selectedBuildingId} onSelectBuilding={setSelectedBuildingId} transportMode={transportMode} />;
             case 'gps': return <GPSTab />;
             case 'wifi': return <WifiTab />;
-            default: return <VoxelCampus selectedBuildingId={selectedBuildingId} onSelectBuilding={setSelectedBuildingId} />;
+            case 'ar': return <ARPage />;
+            case 'thesis': return <ThesisTab />;
+            default: return <VoxelCampus selectedBuildingId={selectedBuildingId} onSelectBuilding={setSelectedBuildingId} transportMode={transportMode} onTransportModeChange={setTransportMode} />;
         }
     };
 

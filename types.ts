@@ -5,6 +5,7 @@ export interface Building {
   position: [number, number, number];
   size: [number, number, number];
   color?: string;
+  rotation?: [number, number, number];
 }
 
 export interface BuildingRecord {

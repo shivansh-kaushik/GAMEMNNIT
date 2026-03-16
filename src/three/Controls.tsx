@@ -3,10 +3,22 @@ import { useFrame, useThree } from '@react-three/fiber';
 import { PointerLockControls as PointerLockControlsImpl } from '@react-three/drei';
 import * as THREE from 'three';
 
-const MOVE_SPEED = 5;
+import { TransportMode } from '../components/TransportSelector';
+
+const BASE_SPEED = {
+    walk: 5,
+    cycle: 12,
+    car: 25
+};
+
+const BASE_HEIGHT = {
+    walk: 1.7,
+    cycle: 1.8,
+    car: 1.4
+};
+
 const JUMP_FORCE = 5;
 const GRAVITY = -15;
-const PLAYER_HEIGHT = 1.7;
 const VERTICAL_SPEED = 6;
 
 interface ControlsProps {
@@ -14,9 +26,11 @@ interface ControlsProps {
     onPlaceBlock?: (position: [number, number, number]) => void;
     mobileInput?: { forward: number; turn: number; jump: boolean; down: boolean; lookDx: number; lookDy: number };
     onPositionUpdate?: (position: [number, number, number]) => void;
+    onHeadingUpdate?: (heading: number) => void;
     onLookConsumed?: () => void;
     overridePosition?: [number, number, number] | null;
     selectedBlock?: { color: string; type: 'B' | 'R' };
+    transportMode?: TransportMode;
 }
 
 export const Controls: React.FC<ControlsProps> = ({
@@ -24,9 +38,11 @@ export const Controls: React.FC<ControlsProps> = ({
     onPlaceBlock,
     mobileInput,
     onPositionUpdate,
+    onHeadingUpdate,
     onLookConsumed,
     overridePosition = null,
-    selectedBlock
+    selectedBlock,
+    transportMode = 'walk'
 }) => {
     const { camera, scene, raycaster } = useThree();
     const velocity = useRef(new THREE.Vector3());
@@ -148,7 +164,8 @@ export const Controls: React.FC<ControlsProps> = ({
         const direction = new THREE.Vector3();
         const frontVector = new THREE.Vector3(0, 0, Number(backward) - Number(forward));
         const sideVector = new THREE.Vector3(Number(left) - Number(right), 0, 0);
-        direction.subVectors(frontVector, sideVector).normalize().multiplyScalar(MOVE_SPEED).applyQuaternion(camera.quaternion);
+        const currentSpeed = BASE_SPEED[transportMode] || BASE_SPEED.walk;
+        direction.subVectors(frontVector, sideVector).normalize().multiplyScalar(currentSpeed).applyQuaternion(camera.quaternion);
         direction.y = 0; // ignore vertical from look direction
 
         camera.position.x += direction.x * delta;
@@ -159,18 +176,22 @@ export const Controls: React.FC<ControlsProps> = ({
         if (down) camera.position.y -= VERTICAL_SPEED * delta;
 
         // Floor clamp so player doesn't fall below ground
-        if (camera.position.y < PLAYER_HEIGHT) {
-            camera.position.y = PLAYER_HEIGHT;
+        const currentHeight = BASE_HEIGHT[transportMode] || BASE_HEIGHT.walk;
+        if (camera.position.y < currentHeight) {
+            camera.position.y = currentHeight;
         }
 
         if (overridePosition) {
-            camera.position.set(overridePosition[0], overridePosition[1] + PLAYER_HEIGHT, overridePosition[2]);
+            camera.position.set(overridePosition[0], overridePosition[1] + currentHeight, overridePosition[2]);
         }
 
         // Emit position update every 200ms
         const now = state.clock.getElapsedTime();
         if (onPositionUpdate && now - lastEmitTime.current > 0.2) {
             onPositionUpdate([camera.position.x, camera.position.y, camera.position.z]);
+            if (onHeadingUpdate) {
+                onHeadingUpdate(camera.rotation.y);
+            }
             lastEmitTime.current = now;
         }
     });
@@ -178,18 +199,7 @@ export const Controls: React.FC<ControlsProps> = ({
     return (
         <>
             {!isTouch && <PointerLockControlsImpl />}
-            {isAdmin && ghostPos && selectedBlock && (
-                <mesh position={[ghostPos[0] + 0.5, ghostPos[1] + 0.5, ghostPos[2] + 0.5]}>
-                    <boxGeometry args={[1.01, 1.01, 1.01]} />
-                    <meshStandardMaterial
-                        color={selectedBlock.color}
-                        transparent
-                        opacity={0.4}
-                        emissive={selectedBlock.color}
-                        emissiveIntensity={0.5}
-                    />
-                </mesh>
-            )}
+            {/* Ghost block temporarily removed as inventory feature is disabled */}
         </>
     );
 };

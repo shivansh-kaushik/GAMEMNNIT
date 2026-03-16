@@ -17,11 +17,11 @@ export const CampusLayout: React.FC<CampusLayoutProps> = ({ buildings, roads }) 
         <group>
             {/* Static Buildings */}
             {buildings.map((b, i) => {
-                if (b.id === 'academic') {
-                    return <AcademicBuilding key={`building-${i}`} position={b.position} />;
+                if (b.id === 'academic' || b.name.includes('ACADEMIC') || b.name.includes('CSE')) {
+                    return <AcademicBuilding key={`building-${i}`} position={b.position} size={b.size} rotation={b.rotation} />;
                 }
-                if (b.id === 'admin') {
-                    return <AdminBuilding key={`building-${i}`} position={b.position} />;
+                if (b.id === 'admin' || b.name.includes('ADMIN')) {
+                    return <AdminBuilding key={`building-${i}`} position={b.position} size={b.size} rotation={b.rotation} />;
                 }
                 return (
                     <Building

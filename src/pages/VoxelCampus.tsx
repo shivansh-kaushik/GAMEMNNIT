@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useMemo, Suspense } from 'react';
+import React, { useState, useCallback, useEffect, useMemo, Suspense, useRef } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { Sky, Html } from '@react-three/drei';
 import { CampusLayout } from '../three/CampusLayout';
@@ -19,17 +19,29 @@ import { BuildingData, BuildingRecord, RoadRecord } from '../../types';
 import { aStar } from '../navigation/astar';
 import { buildGraphFromGeoJSON, findNearestNode } from '../navigation/graphGenerator';
 import pathData from '../data/mnnit_paths.json';
+import { findNearestGraphNode } from '../navigation/nodeMatcher';
+import { locationService, LocationData } from '../localization/locationService';
+import { transformGPSToDigitalTwin } from '../core/coordinateTransform';
 import { useSmartPositioning, PositioningMode } from '../sensors/useSmartPositioning';
+
+import { TransportSelector, TransportMode } from '../components/TransportSelector';
+import { PlayerAvatar } from '../three/PlayerAvatar';
+import { NavigationArrow } from '../three/NavigationArrow';
 
 const GRID_SIZE = 80;
 
 interface VoxelCampusProps {
     selectedBuildingId: string | null;
     onSelectBuilding: (id: string | null) => void;
+    transportMode: TransportMode;
+    onTransportModeChange?: (mode: TransportMode) => void;
 }
-
-export const VoxelCampus: React.FC<VoxelCampusProps> = ({ selectedBuildingId, onSelectBuilding }) => {
+export const VoxelCampus: React.FC<VoxelCampusProps> = ({ selectedBuildingId, onSelectBuilding, transportMode, onTransportModeChange }) => {
     const [buildings, setBuildings] = useState<BuildingData[]>([]);
+    // Calibration State for Buildings
+    const [tweaks, setTweaks] = useState({
+        adX: -45, adZ: 5, adRot: 0
+    });
     const [roads, setRoads] = useState<[number, number][]>([]);
     const [user, setUser] = useState<Models.User<Models.Preferences> | null>(null);
     const [isAdmin, setIsAdmin] = useState(false);
@@ -50,6 +62,23 @@ export const VoxelCampus: React.FC<VoxelCampusProps> = ({ selectedBuildingId, on
     const blockedAreas = useMemo(() => buildings.map(b => ({ position: b.position, size: b.size })), [buildings]);
     const navigationGraph = useMemo(() => buildGraphFromGeoJSON(pathData), []);
 
+    const [myLocalizationPos, setMyLocalizationPos] = useState<[number, number, number] | null>(null);
+    const lastPosRef = useRef<[number, number, number] | null>(null);
+    const lastTargetIdRef = useRef<string | null>(null);
+    const [playerPos, setPlayerPos] = useState<[number, number, number]>([0, 0, 0]);
+    const [playerHeading, setPlayerHeading] = useState(0);
+
+    useEffect(() => {
+        const onLocUpdate = (loc: LocationData) => {
+            if (positioningMode !== 'simulator') {
+                const { x, z } = transformGPSToDigitalTwin(loc.lat, loc.lon);
+                setMyLocalizationPos([x, 0, z]);
+            }
+        };
+        locationService.start(onLocUpdate);
+        return () => locationService.stop(onLocUpdate);
+    }, [positioningMode]);
+
     useEffect(() => {
         account.get()
             .then((u) => { setUser(u); setIsAdmin(true); })
@@ -69,23 +98,45 @@ export const VoxelCampus: React.FC<VoxelCampusProps> = ({ selectedBuildingId, on
     const fetchBuildings = useCallback(async () => {
         try {
             const res = await databases.listDocuments(DB_ID, BUILDINGS_COLLECTION_ID);
+
             const mapped: BuildingData[] = res.documents.map((d: any) => {
                 const doc = d as any as BuildingRecord;
+                let pos = latLngToVoxel(doc.lat, doc.lng);
+                let sz = [doc.width, doc.height, doc.depth] as [number, number, number];
+                let rot: [number, number, number] | undefined = undefined;
+
+                if (doc.name.includes("ACADEMIC") || doc.name.includes("CSE")) {
+                    pos = [85, 0.5, 5];
+                    sz = [210, 12, 170];
+                    rot = [0, -0.25, 0];
+                } else if (doc.name.includes("ADMIN")) {
+                    pos = [tweaks.adX, 0.5, tweaks.adZ];
+                    sz = [80, 16, 50];
+                    rot = [0, tweaks.adRot, 0];
+                }
+
                 return {
                     id: doc.$id,
                     name: doc.name,
                     type: doc.type,
-                    position: latLngToVoxel(doc.lat, doc.lng),
-                    size: [doc.width, doc.height, doc.depth],
+                    position: pos,
+                    size: sz,
+                    rotation: rot,
                     color: doc.color,
                 };
             });
             setBuildings(mapped);
         } catch (e) {
             console.warn('Buildings collection error fallback used');
+
+            const TWEAKS = {
+                academic: { pos: [85, 0.5, 5], rot: [0, -0.25, 0], size: [210, 12, 170] },
+                admin: { pos: [60, 0.5, 40], rot: [0, -1.8, 0], size: [80, 16, 50] }
+            };
+
             setBuildings([
-                { id: 'academic', name: "ACADEMIC BUILDING", type: 'academic', position: [25, 0, 15], size: [40, 12, 30], color: "#fef3c7" },
-                { id: 'admin', name: "ADMIN BUILDING", type: 'admin', position: [20, 0, -25], size: [50, 16, 25], color: "#d9b38c" },
+                { id: 'academic', name: "ACADEMIC BUILDING", type: 'academic', position: TWEAKS.academic.pos as [number, number, number], size: TWEAKS.academic.size as [number, number, number], rotation: TWEAKS.academic.rot as [number, number, number], color: "#fef3c7" },
+                { id: 'admin', name: "ADMIN BUILDING", type: 'admin', position: TWEAKS.admin.pos as [number, number, number], size: TWEAKS.admin.size as [number, number, number], rotation: TWEAKS.admin.rot as [number, number, number], color: "#d9b38c" },
             ]);
         }
     }, []);
@@ -177,13 +228,19 @@ export const VoxelCampus: React.FC<VoxelCampusProps> = ({ selectedBuildingId, on
                 <hemisphereLight intensity={0.5} groundColor="#444444" />
                 <directionalLight position={[50, 100, 50]} intensity={1.5} castShadow shadow-mapSize={[isMobile ? 1024 : 4096, isMobile ? 1024 : 4096]} />
 
-                <CampusLayout buildings={buildings} roads={roads} />
+                <CampusLayout buildings={buildings} roads={[]} />
                 <DynamicBlocks blocks={placedBlocks} />
                 <PathRenderer path={activePath} />
-                <TreeRenderer count={isMobile ? 60 : 150} boundary={180} blockedAreas={blockedAreas} />
+
+                <PlayerAvatar position={playerPos} rotation={playerHeading} mode={transportMode} />
+
+                <NavigationArrow
+                    playerPos={playerPos}
+                    targetPos={selectedBuildingId ? (buildings.find(b => b.id === selectedBuildingId)?.position || null) : null}
+                />
 
                 <Suspense fallback={<Html center><span style={{ color: 'white', background: 'rgba(0,0,0,0.6)', padding: '8px 16px', borderRadius: 8, fontSize: '12px' }}>🌍 Loading Map...</span></Html>}>
-                    <MapboxGround center={MNNIT_CENTER} zoom={18} size={200} />
+                    <MapboxGround center={MNNIT_CENTER} zoom={17} size={1104} />
                 </Suspense>
 
 
@@ -192,38 +249,64 @@ export const VoxelCampus: React.FC<VoxelCampusProps> = ({ selectedBuildingId, on
                     onPlaceBlock={handlePlaceBlock}
                     selectedBlock={selectedBlock}
                     mobileInput={mobileInput}
+                    transportMode={transportMode}
                     onLookConsumed={() => setMobileInput(prev => ({ ...prev, lookDx: 0, lookDy: 0 }))}
-                    overridePosition={finalPos}
+                    overridePosition={positioningMode === 'simulator' ? finalPos : (myLocalizationPos || finalPos)}
+                    onHeadingUpdate={(heading) => setPlayerHeading(heading)}
                     onPositionUpdate={(pos) => {
+                        setPlayerPos(pos);
                         updateSimulatorPos(pos); // Feed simulator pos to positioning logic
 
                         if (selectedBuildingId) {
-                            const startTime = performance.now();
+                            let shouldRecalc = false;
 
-                            // 1. Find nearest graph node to player
-                            const startNodeId = findNearestNode(pos[0], pos[2], navigationGraph.nodes);
-
-                            // 2. Find nearest graph node to destination building
-                            const b = buildings.find(b => b.id === selectedBuildingId);
-                            let targetNodeId = '';
-                            if (b) {
-                                targetNodeId = findNearestNode(b.position[0], b.position[2], navigationGraph.nodes);
+                            // Check if destination changed
+                            if (selectedBuildingId !== lastTargetIdRef.current) {
+                                shouldRecalc = true;
+                                lastTargetIdRef.current = selectedBuildingId;
                             }
 
-                            if (startNodeId && targetNodeId) {
-                                // 3. Perform graph-based A*
-                                const routeIds = aStar(startNodeId, targetNodeId, navigationGraph.nodes, navigationGraph.edges);
+                            // Check distance > 5m
+                            if (!lastPosRef.current) {
+                                shouldRecalc = true;
+                            } else {
+                                const dx = pos[0] - lastPosRef.current[0];
+                                const dz = pos[2] - lastPosRef.current[2];
+                                const dist = Math.sqrt(dx * dx + dz * dz);
+                                if (dist > 5) shouldRecalc = true;
+                            }
 
-                                // 4. Convert IDs to points for renderer
-                                const pathPoints = routeIds.map(id => ({
-                                    x: navigationGraph.nodes[id].x,
-                                    z: navigationGraph.nodes[id].z
-                                }));
+                            if (shouldRecalc) {
+                                lastPosRef.current = pos;
+                                const startTime = performance.now();
 
-                                setActivePath(pathPoints);
-                                setCalcTime(performance.now() - startTime);
+                                // 1. Find nearest graph node to player
+                                const startNodeId = findNearestGraphNode(pos[0], pos[2], navigationGraph.nodes);
+
+                                // 2. Find nearest graph node to destination building
+                                const b = buildings.find(b => b.id === selectedBuildingId);
+                                let targetNodeId: string | null = null;
+                                if (b) {
+                                    targetNodeId = findNearestGraphNode(b.position[0], b.position[2], navigationGraph.nodes);
+                                }
+
+                                if (startNodeId && targetNodeId) {
+                                    // 3. Perform graph-based A*
+                                    const routeIds = aStar(startNodeId, targetNodeId, navigationGraph.nodes, navigationGraph.edges);
+
+                                    // 4. Convert IDs to points for renderer
+                                    const pathPoints = routeIds.map(id => ({
+                                        x: navigationGraph.nodes[id].x,
+                                        z: navigationGraph.nodes[id].z
+                                    }));
+
+                                    setActivePath(pathPoints);
+                                    setCalcTime(performance.now() - startTime);
+                                }
                             }
                         } else {
+                            lastTargetIdRef.current = null;
+                            lastPosRef.current = null;
                             setActivePath([]);
                             setCalcTime(0);
                         }
@@ -249,8 +332,8 @@ export const VoxelCampus: React.FC<VoxelCampusProps> = ({ selectedBuildingId, on
             </div >
 
             {/* UI Overlays */}
-            < div style={{ position: 'absolute', top: isMobile ? '10px' : '20px', left: isMobile ? '10px' : '20px', color: 'white', fontFamily: 'monospace', pointerEvents: 'none', width: isMobile ? '160px' : '300px', zIndex: 3000, display: 'flex', flexDirection: 'column', gap: isMobile ? '5px' : '10px' }}>
-                <h1 style={{ margin: 0, fontSize: isMobile ? '14px' : '18px', letterSpacing: '2px', textShadow: '0 0 10px #00ff88' }}>🏛 MNNIT TWIN</h1>
+            < div style={{ position: 'absolute', top: isMobile ? '10px' : '20px', left: isMobile ? '10px' : '20px', color: 'white', fontFamily: 'monospace', pointerEvents: 'none', width: isMobile ? '140px' : '300px', zIndex: 3000, display: 'flex', flexDirection: 'column', gap: isMobile ? '4px' : '10px' }}>
+                <h1 style={{ margin: 0, fontSize: isMobile ? '12px' : '18px', letterSpacing: '2px', textShadow: '0 0 10px #00ff88' }}>🏛 MNNIT TWIN</h1>
 
                 <div style={{ pointerEvents: 'auto', display: 'flex', flexDirection: 'column', gap: '5px', background: 'rgba(0,0,0,0.5)', padding: '10px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)', backdropFilter: 'blur(5px)' }}>
                     <label style={{ fontSize: '9px', color: '#888', letterSpacing: '1px' }}>POSITIONING MODE</label>
@@ -266,8 +349,12 @@ export const VoxelCampus: React.FC<VoxelCampusProps> = ({ selectedBuildingId, on
                     </select>
                 </div>
 
+                {onTransportModeChange && (
+                    <TransportSelector mode={transportMode} onModeChange={onTransportModeChange} />
+                )}
+
                 {
-                    !user ? (
+                    !isMobile && (!user ? (
                         <div style={{ pointerEvents: 'auto' }}>
                             <button onClick={handleLogin} style={buttonStyle('#4285F4')}>🔑 LOGIN WITH GOOGLE</button>
                         </div>
@@ -277,50 +364,43 @@ export const VoxelCampus: React.FC<VoxelCampusProps> = ({ selectedBuildingId, on
                                 <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.email}</span>
                                 <button onClick={handleLogout} style={smallBtnStyle}>LOGOUT</button>
                             </div>
-                            <div style={{ display: 'flex', gap: '8px' }}>
-                                <button onClick={() => setShowInventory(true)} style={{ width: 40, height: 40, border: '2px solid #00ff88', cursor: 'pointer', borderRadius: 6, background: selectedBlock.color, boxShadow: `0 0 10px ${selectedBlock.color}88` }}>📦</button>
-                            </div>
                         </div>
-                    )
+                    ))
                 }
 
-                {/* Research Evaluation / Metrics Panel (Now part of the left column flow) */}
-                <div style={{ background: 'rgba(0,0,0,0.85)', padding: '12px', borderRadius: '12px', border: '1px solid #00ff88', backdropFilter: 'blur(15px)', color: 'white', pointerEvents: 'none', boxShadow: '0 10px 30px rgba(0,255,136,0.1)' }}>
-                    <div style={{ fontSize: isMobile ? '9px' : '11px', color: '#00ff88', marginBottom: '8px', fontWeight: 'bold', letterSpacing: '2px', borderBottom: '1px solid rgba(0,255,136,0.2)', paddingBottom: '6px' }}>RESEARCH EVALUATION</div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: isMobile ? '9px' : '11px' }}>
-                            <span style={{ color: '#888' }}>Algorithm:</span>
-                            <span style={{ color: '#fff', fontWeight: 'bold', fontSize: isMobile ? '8px' : '11px' }}>A* (Graph-Based)</span>
-                        </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: isMobile ? '9px' : '11px' }}>
-                            <span style={{ color: '#888' }}>Latency:</span>
-                            <span style={{ color: '#00ff88' }}>{calcTime.toFixed(2)}ms</span>
-                        </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: isMobile ? '9px' : '11px' }}>
-                            <span style={{ color: '#888' }}>Pos Error:</span>
-                            <span style={{ color: '#fff' }}>{positionError ? `${positionError.toFixed(1)}m` : '0m'}</span>
-                        </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: isMobile ? '9px' : '11px' }}>
-                            <span style={{ color: '#888' }}>FPS:</span>
-                            <span style={{ color: fps > 30 ? '#00ff88' : '#ff4444' }}>{fps}</span>
-                        </div>
-                        <div style={{ marginTop: '8px', paddingTop: '8px', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
-                            <div style={{ fontSize: isMobile ? '8px' : '9px', color: '#666', marginBottom: '3px' }}>THESIS EXPT:</div>
-                            <div style={{ fontSize: isMobile ? '9px' : '10px', color: '#aaa', fontStyle: 'italic', lineHeight: 1.2 }}>"Nav efficiency +28%"</div>
+                {/* Research Evaluation - hidden on mobile */}
+                {!isMobile && (
+                    <div style={{ background: 'rgba(0,0,0,0.85)', padding: '12px', borderRadius: '12px', border: '1px solid #00ff88', backdropFilter: 'blur(15px)', color: 'white', pointerEvents: 'none', boxShadow: '0 10px 30px rgba(0,255,136,0.1)' }}>
+                        <div style={{ fontSize: '11px', color: '#00ff88', marginBottom: '8px', fontWeight: 'bold', letterSpacing: '2px', borderBottom: '1px solid rgba(0,255,136,0.2)', paddingBottom: '6px' }}>RESEARCH EVALUATION</div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px' }}>
+                                <span style={{ color: '#888' }}>Algorithm:</span>
+                                <span style={{ color: '#fff', fontWeight: 'bold' }}>A* (Graph-Based)</span>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px' }}>
+                                <span style={{ color: '#888' }}>Latency:</span>
+                                <span style={{ color: '#00ff88' }}>{calcTime.toFixed(2)}ms</span>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px' }}>
+                                <span style={{ color: '#888' }}>Pos Error:</span>
+                                <span style={{ color: '#fff' }}>{positionError ? `${positionError.toFixed(1)}m` : '0m'}</span>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px' }}>
+                                <span style={{ color: '#888' }}>FPS:</span>
+                                <span style={{ color: fps > 30 ? '#00ff88' : '#ff4444' }}>{fps}</span>
+                            </div>
+                            <div style={{ marginTop: '8px', paddingTop: '8px', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+                                <div style={{ fontSize: '9px', color: '#666', marginBottom: '3px' }}>THESIS EXPT:</div>
+                                <div style={{ fontSize: '10px', color: '#aaa', fontStyle: 'italic', lineHeight: 1.2 }}>"Nav efficiency +28%"</div>
+                            </div>
                         </div>
                     </div>
-                </div>
+                )}
             </div >
 
-            <div style={{ position: 'absolute', top: isMobile ? '85px' : 'auto', bottom: isMobile ? 'auto' : '20px', right: isMobile ? '10px' : '20px', left: 'auto', pointerEvents: 'auto', transform: isMobile ? 'scale(0.6)' : 'none', transformOrigin: isMobile ? 'top right' : 'bottom right', zIndex: 3000 }}>
+            <div style={{ position: 'absolute', top: isMobile ? 'auto' : 'auto', bottom: isMobile ? '70px' : '20px', right: isMobile ? '5px' : '20px', left: 'auto', pointerEvents: 'auto', transform: isMobile ? 'scale(0.5)' : 'none', transformOrigin: isMobile ? 'bottom right' : 'bottom right', zIndex: 3000 }}>
                 <Minimap userPos={finalPos || [0, 0, 0]} buildings={buildings} destination={buildings.find(b => b.id === selectedBuildingId)?.name} />
             </div>
-
-            {
-                showInventory && isAdmin && (
-                    <Inventory onSelect={(item) => { setSelectedBlock(item); setShowInventory(false); }} onClose={() => setShowInventory(false)} />
-                )
-            }
 
             <MobileControls
                 onMove={(f, t) => setMobileInput(prev => ({ ...prev, forward: f, turn: t }))}
