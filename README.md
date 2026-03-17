@@ -57,6 +57,19 @@ The resulting prototype, validated on the MNNIT Allahabad campus dataset, demons
 
 ---
 
+## 🧠 System Design Highlights
+
+| Highlight | Why It Matters |
+|---|---|
+| **Real-time closed-loop AR pipeline** | User → AI → Navigation → Sensors → AR → User forms a fully reactive feedback cycle |
+| **Confidence-Aware Sensor Fusion** | Instead of blindly trusting GPS/compass, uncertainty is visualized as an AR cone — enabling safe navigation even during sensor degradation |
+| **AI → Structured JSON → Deterministic Pipeline** | LLM is constrained to a fixed intent schema, ensuring reproducible, deterministic routing behavior (not a chatbot) |
+| **Digital Twin + Live OSM Data** | Three.js campus scene is grounded in real OpenStreetMap geometry, not placeholder art |
+| **Self-Reflecting Documentation** | README is rendered live inside the Thesis Tab via Vite `?raw` import — documentation and system are always in sync |
+| **State: Current client-side; Future: Zustand/microservices** | Navigation state is managed via React hooks, with a clear migration path to centralized state for production scale |
+
+---
+
 ## 2. Introduction
 
 Modern university campuses are increasingly adopting *smart campus* paradigms, where digital infrastructure augments physical accessibility, mobility, and information delivery. Yet despite widespread GPS-based routing, navigation within dense campus environments remains cognitively demanding — particularly for first-year students and visitors who must locate specific building entrances, laboratory floors, or departmental offices within large multi-story structures.
