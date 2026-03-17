@@ -12,6 +12,7 @@ const TABS = [
     { id: 'wifi', label: '📶 WIFI RSSI', icon: '📡' },
     { id: 'ar', label: '📷 AR NAVIGATION', icon: '📷' },
     { id: 'thesis', label: '🎓 THESIS', icon: '📜' },
+    { id: 'layout', label: '📐 LAYOUT TOOL', icon: '🗺️' }
 ];
 
 export const Tabs: React.FC<TabsProps> = ({ activeTab, onTabChange }) => {

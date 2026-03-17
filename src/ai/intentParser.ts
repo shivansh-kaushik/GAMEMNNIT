@@ -4,6 +4,7 @@
  */
 
 import { CAMPUS_BUILDINGS } from '../navigation/buildings';
+import { ARSensors } from '../ar/arEngine';
 
 export interface NavIntent {
     intent: 'navigate' | 'info' | 'unknown';
@@ -70,19 +71,34 @@ function createNavIntent(match: any): NavIntent {
 }
 
 /** Build the LLM system prompt for navigation intent extraction */
-export function buildNavigationPrompt(userQuery: string): string {
+export function buildNavigationPrompt(sensors: ARSensors | null, activeDestId: string | null): string {
     const buildingList = CAMPUS_BUILDINGS
         .map(b => `"${b.name}"`)
         .join(', ');
 
+    let contextStr = "User's current location is UNKNOWN (GPS not locked).";
+    if (sensors) {
+        contextStr = `User's current location: GPS(${sensors.gpsLat.toFixed(5)}, ${sensors.gpsLon.toFixed(5)}). Compass Heading: ${Math.round(sensors.compassBearing)}°.`;
+    }
+    
+    let destStr = "The user is not currently navigating anywhere.";
+    if (activeDestId) {
+        const destName = CAMPUS_BUILDINGS.find(b => b.id === activeDestId)?.name || activeDestId;
+        destStr = `The user is CURRENTLY navigating to: ${destName}.`;
+    }
+
     return `You are an AI navigation assistant for the MNNIT Allahabad Smart Campus Navigation System.
 Your purpose is to help users navigate the campus efficiently and answer questions related to campus locations.
+
+LIVE CONTEXT:
+- ${contextStr}
+- ${destStr}
 
 Rules:
 1. ONLY answer questions related to: Campus navigation, Buildings, Departments, Hostels, Gates, Facilities, Paths and routes, Campus services.
 2. If a user asks something unrelated to campus navigation, respond EXACTLY with: "I can only assist with MNNIT campus navigation."
-3. Use the provided campus location dataset for coordinates.
-4. When a user asks "Where is [Place]" or for directions:
+3. Use the provided campus location dataset for coordinates. Use the LIVE CONTEXT to answer relative questions like "where am I" or "what is in front of me".
+4. When a user asks for directions or to go somewhere:
    * You MUST identify the place from the dataset.
    * You MUST include the coordinates (latitude and longitude) in your conversational response.
    * You MUST also provide the JSON block at the end.
@@ -101,9 +117,7 @@ Example interaction:
 User: "Where is the library?"
 Assistant: "The Central Library is located at (25.49268, 81.86355). You can use the AR navigation to get there. {"intent":"navigate","destination":"CENTRAL LIBRARY (GF)"}"
 
-User Query: "${userQuery}"
-
-First, provide your helpful conversational response (including coordinates). 
+First, provide your helpful conversational response. 
 Then, provide a JSON block for system integration at the VERY END:
 {"intent":"navigate","destination":"<exact building name>"} OR {"intent":"info","reply":"<your conversational response>"} OR {"intent":"unknown"}`;
 }

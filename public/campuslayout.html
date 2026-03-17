@@ -1,0 +1,754 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>MNNIT Voxel Campus – Saved Layout</title>
+    <style>
+        body {
+            margin: 0;
+            background: #111;
+            color: white;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        h1 {
+            margin-top: 20px;
+            color: #00ff88;
+        }
+
+        .container {
+            display: flex;
+            gap: 20px;
+            width: 95%;
+            max-width: 1600px;
+            margin-top: 20px;
+        }
+
+        .map-wrapper {
+            flex: 2;
+            border: 1px solid #333;
+            border-radius: 8px;
+            overflow: hidden;
+            position: relative;
+            min-height: 800px;
+            background: #0a0a0a;
+        }
+
+        .info-panel {
+            flex: 1;
+            background: #1a1a1a;
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 20px;
+            max-height: 800px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        .coord-box {
+            margin-bottom: 20px;
+            padding: 10px;
+            border-radius: 6px;
+            border-left: 4px solid #00ff88;
+            background: #222;
+        }
+
+        .coord-box h3 {
+            margin: 0 0 5px 0;
+            font-size: 14px;
+            color: #00ff88;
+            text-transform: uppercase;
+        }
+
+        .coord-list {
+            font-size: 12px;
+            color: #ccc;
+            line-height: 1.4;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 5px;
+        }
+
+        .coord-list strong {
+            color: #fff;
+        }
+
+        .coord-full-width {
+            grid-column: span 2;
+        }
+
+        .header-info {
+            text-align: center;
+            max-width: 800px;
+            color: #aaa;
+            font-size: 14px;
+            margin-bottom: 20px;
+        }
+
+        .toolbar {
+            margin: 10px 0;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        button {
+            background: #00ff88;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: #00cc66;
+        }
+
+        .selected-controls {
+            background: #2a2a2a;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border: 1px solid #00ff88;
+            display: none;
+        }
+
+        .selected-controls.visible {
+            display: block;
+        }
+
+        .selected-controls h3 {
+            margin: 0 0 10px 0;
+            color: #00ff88;
+        }
+
+        .slider-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .slider-container input {
+            flex: 1;
+        }
+
+        .rotation-value {
+            font-family: monospace;
+            min-width: 60px;
+        }
+
+        .footer-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <h1>🗺️ Voxel Campus – Saved Layout</h1>
+    <div class="header-info">
+        <strong>Voxel Grid:</strong> approx 1000x1000 units · <span style="color:#ff8888">drag any building</span> ·
+        <strong>select → rotate with slider</strong>
+    </div>
+    <div class="toolbar">
+        <button onclick="syncToVoxel()" style="background: #ff0088; color: white;">🚀 Update to Voxel Campus</button>
+        <button onclick="exportData()">📦 Export JSON (console)</button>
+        <button onclick="saveToStorage()">💾 Save to browser</button>
+        <button onclick="resetToDefault()">↩️ Reset default</button>
+        <button onclick="saveAsHTML()">📁 Save as HTML file</button>
+    </div>
+
+    <div class="container">
+        <div class="info-panel" id="coordPanel">
+            <div id="selectedControls" class="selected-controls">
+                <h3 id="selectedBuildingName">—</h3>
+                <div class="slider-container">
+                    <span>↻ rotation (rad)</span>
+                    <input type="range" id="rotSlider" min="-1.57" max="1.57" step="0.01" value="-0.25">
+                    <span id="rotValue" class="rotation-value">-0.25</span>
+                </div>
+            </div>
+            <div id="buildingList"></div>
+        </div>
+        <div class="map-wrapper">
+            <canvas id="campusMap"></canvas>
+        </div>
+    </div>
+
+    <script>
+        // ==================== EMBEDDED BUILDINGS (SAVED LAYOUT) ====================
+        const DEFAULT_BUILDINGS = [
+            {
+                "id": "academic",
+                "name": "ACADEMIC BUILDING",
+                "pos": [
+                    154.23076923076923,
+                    0.5,
+                    -55
+                ],
+                "size": [
+                    210,
+                    12,
+                    170
+                ],
+                "rot": [
+                    0,
+                    0,
+                    0
+                ],
+                "color": "#d2b48c"
+            },
+            {
+                "id": "admin",
+                "name": "ADMIN BUILDING",
+                "pos": [
+                    335.00000000000006,
+                    0.5,
+                    -57.69230769230771
+                ],
+                "size": [
+                    80,
+                    16,
+                    50
+                ],
+                "rot": [
+                    0,
+                    -1.57,
+                    0
+                ],
+                "color": "#fca5a5"
+            },
+            {
+                "id": "sports",
+                "name": "Sports Field",
+                "pos": [
+                    162.69230769230768,
+                    0.1,
+                    102.30769230769234
+                ],
+                "size": [
+                    120,
+                    0.2,
+                    70
+                ],
+                "rot": [
+                    0,
+                    0,
+                    0
+                ],
+                "color": "#4ade80"
+            },
+            {
+                "id": "mech",
+                "name": "Mechanical Building",
+                "pos": [
+                    -20.76923076923076,
+                    0.5,
+                    -3.8461538461538396
+                ],
+                "size": [
+                    70,
+                    14,
+                    80
+                ],
+                "rot": [
+                    0,
+                    -1.57,
+                    0
+                ],
+                "color": "#cda080"
+            },
+            {
+                "id": "multi_purpose",
+                "name": "Multi Purpose",
+                "pos": [
+                    -159.2307692307692,
+                    0.5,
+                    -247.6923076923077
+                ],
+                "size": [
+                    100,
+                    14,
+                    70
+                ],
+                "rot": [
+                    0,
+                    0.02,
+                    0
+                ],
+                "color": "#d2b48c"
+            },
+            {
+                "id": "diamond_jubilee",
+                "name": "DIAMOND JUBILEE UNDERPASS",
+                "pos": [
+                    -123.84615384615384,
+                    0.5,
+                    -165.38461538461542
+                ],
+                "size": [
+                    90,
+                    8,
+                    40
+                ],
+                "rot": [
+                    0,
+                    0,
+                    0
+                ],
+                "color": "#6b7280"
+            },
+            {
+                "id": "underpass_tunnel",
+                "name": "UNDERPASS TUNNEL ROAD",
+                "pos": [
+                    -143.07692307692304,
+                    0.5,
+                    80.76923076923076
+                ],
+                "size": [
+                    120,
+                    8,
+                    50
+                ],
+                "rot": [
+                    0,
+                    0,
+                    0
+                ],
+                "color": "#6b7280"
+            },
+            {
+                "id": "dean_acad",
+                "name": "DEAN ACADMICS",
+                "pos": [
+                    221.53846153846158,
+                    0.5,
+                    -184.6153846153846
+                ],
+                "size": [
+                    60,
+                    10,
+                    40
+                ],
+                "rot": [
+                    0,
+                    0,
+                    0
+                ],
+                "color": "#e2c49c"
+            },
+            {
+                "id": "cafe98",
+                "name": "CAFE 98",
+                "pos": [
+                    214.61538461538464,
+                    0.5,
+                    -236.15384615384616
+                ],
+                "size": [
+                    50,
+                    8,
+                    30
+                ],
+                "rot": [
+                    0,
+                    0,
+                    0
+                ],
+                "color": "#e2c49c"
+            },
+            {
+                "id": "csed",
+                "name": "CSED",
+                "pos": [
+                    116.15384615384616,
+                    0.5,
+                    -286.9230769230769
+                ],
+                "size": [
+                    70,
+                    14,
+                    60
+                ],
+                "rot": [
+                    0,
+                    0,
+                    0
+                ],
+                "color": "#d2b48c"
+            },
+            {
+                "id": "sms",
+                "name": "SMS",
+                "pos": [
+                    -132.3076923076923,
+                    0.5,
+                    -366.9230769230769
+                ],
+                "size": [
+                    80,
+                    14,
+                    40
+                ],
+                "rot": [
+                    0,
+                    0,
+                    0
+                ],
+                "color": "#d2b48c"
+            },
+            {
+                "id": "girls_hostel",
+                "name": "GIRLS HOSTEL",
+                "pos": [
+                    113.84615384615384,
+                    0.5,
+                    -367.6923076923077
+                ],
+                "size": [
+                    60,
+                    16,
+                    40
+                ],
+                "rot": [
+                    0,
+                    0,
+                    0
+                ],
+                "color": "#cda080"
+            },
+            {
+                "id": "boys_hostel",
+                "name": "BOYS HOSTEL",
+                "pos": [
+                    223.84615384615384,
+                    0.5,
+                    -375.3846153846154
+                ],
+                "size": [
+                    60,
+                    16,
+                    40
+                ],
+                "rot": [
+                    0,
+                    -0.02,
+                    0
+                ],
+                "color": "#cda080"
+            },
+            {
+                "id": "nadcab",
+                "name": "NADCAB",
+                "pos": [
+                    333.07692307692304,
+                    0.5,
+                    -210.76923076923075
+                ],
+                "size": [
+                    60,
+                    12,
+                    50
+                ],
+                "rot": [
+                    0,
+                    0,
+                    0
+                ],
+                "color": "#d2b48c"
+            }
+        ];
+
+        // ------------------------------------------------------------
+        // CURRENT BUILDING DATA (loaded from storage or default)
+        // ------------------------------------------------------------
+        let BUILDINGS = [];
+
+        // ------------------------------------------------------------
+        // GLOBAL DRAG & SELECTION STATE
+        // ------------------------------------------------------------
+        let selectedBuilding = null;
+        let isDragging = false;
+        let dragOffsetX = 0, dragOffsetZ = 0;
+
+        // ------------------------------------------------------------
+        // CANVAS & PANEL ELEMENTS
+        // ------------------------------------------------------------
+        const canvas = document.getElementById('campusMap');
+        const ctx = canvas.getContext('2d');
+        const panel = document.getElementById('buildingList');
+        const selectedControlsDiv = document.getElementById('selectedControls');
+        const selectedNameSpan = document.getElementById('selectedBuildingName');
+        const rotSlider = document.getElementById('rotSlider');
+        const rotValue = document.getElementById('rotValue');
+
+        // ------------------------------------------------------------
+        // LOAD/SAVE to localStorage
+        // ------------------------------------------------------------
+        function loadFromStorage() {
+            const stored = localStorage.getItem('campusBuildings');
+            if (stored) {
+                try {
+                    BUILDINGS = JSON.parse(stored);
+                } catch (e) {
+                    console.warn('Failed to parse stored data, using default.');
+                    BUILDINGS = JSON.parse(JSON.stringify(DEFAULT_BUILDINGS));
+                }
+            } else {
+                BUILDINGS = JSON.parse(JSON.stringify(DEFAULT_BUILDINGS));
+            }
+        }
+
+        function saveToStorage() {
+            localStorage.setItem('campusBuildings', JSON.stringify(BUILDINGS));
+            alert('✅ Current layout saved to browser storage.');
+        }
+
+        function syncToVoxel() {
+            localStorage.setItem('campusBuildings', JSON.stringify(BUILDINGS));
+            broadcastLayout();
+            alert('🚀 Layout Synced! Switch to the Voxel Campus tab to see the changes.');
+        }
+
+        function resetToDefault() {
+            if (confirm('Reset all buildings to original (saved) layout?')) {
+                BUILDINGS = JSON.parse(JSON.stringify(DEFAULT_BUILDINGS));
+                selectedBuilding = null;
+                selectedControlsDiv.classList.remove('visible');
+                drawMap();
+                updatePanel();
+                broadcastLayout();
+            }
+        }
+
+        // ------------------------------------------------------------
+        // SCREEN <-> WORLD conversion
+        // ------------------------------------------------------------
+        function screenToWorld(screenX, screenY) {
+            const scale = 1.3;
+            const offsetX = canvas.width / 2 - 100;
+            const offsetY = canvas.height / 2 + 150;
+            const worldX = (screenX - offsetX) / scale;
+            const worldZ = (screenY - offsetY) / scale;
+            return { x: worldX, z: worldZ };
+        }
+
+        function isPointInsideBuilding(px, pz, building) {
+            const dx = px - building.pos[0];
+            const dz = pz - building.pos[2];
+            const angle = -building.rot[1];
+            const localX = dx * Math.cos(angle) - dz * Math.sin(angle);
+            const localZ = dx * Math.sin(angle) + dz * Math.cos(angle);
+            const halfW = building.size[0] / 2;
+            const halfD = building.size[2] / 2;
+            return (Math.abs(localX) <= halfW && Math.abs(localZ) <= halfD);
+        }
+
+        function drawRotatedRect(item) {
+            ctx.save();
+            const scale = 1.3;
+            const offsetX = canvas.width / 2 - 100;
+            const offsetY = canvas.height / 2 + 150;
+
+            const cx = (item.pos[0] * scale) + offsetX;
+            const cy = (item.pos[2] * scale) + offsetY;
+
+            ctx.translate(cx, cy);
+            ctx.rotate(-item.rot[1]);
+
+            const w = item.size[0] * scale;
+            const h = item.size[2] * scale;
+
+            ctx.fillStyle = item.color;
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 1;
+            ctx.globalAlpha = 0.7;
+
+            ctx.fillRect(-w / 2, -h / 2, w, h);
+            ctx.strokeRect(-w / 2, -h / 2, w, h);
+
+            ctx.fillStyle = '#ff0000';
+            ctx.globalAlpha = 1;
+            ctx.fillRect(-w / 2, h / 2 - 2, w, 2);
+
+            ctx.restore();
+
+            ctx.fillStyle = '#fff';
+            ctx.font = '10px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText(item.name.split(' ')[0], cx, cy);
+        }
+
+        function drawMap() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            ctx.strokeStyle = '#222';
+            ctx.lineWidth = 1;
+            for (let x = 0; x < canvas.width; x += 50) {
+                ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
+            }
+            for (let y = 0; y < canvas.height; y += 50) {
+                ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
+            }
+
+            BUILDINGS.forEach(drawRotatedRect);
+        }
+
+        function broadcastLayout() {
+            if (window.parent && window.parent !== window) {
+                window.parent.postMessage({ type: 'VOXEL_LAYOUT_UPDATE', payload: BUILDINGS }, '*');
+            }
+        }
+
+        function updatePanel() {
+            let html = '';
+            BUILDINGS.forEach(b => {
+                const angle = b.rot[1];
+                const hw = b.size[0] / 2;
+                const hd = b.size[2] / 2;
+
+                const cornersRel = [
+                    { x: hw, z: hd, label: 'Front Right' },
+                    { x: -hw, z: hd, label: 'Front Left' },
+                    { x: hw, z: -hd, label: 'Back Right' },
+                    { x: -hw, z: -hd, label: 'Back Left' }
+                ];
+
+                let block = `<div class="coord-box" style="border-color: ${b.color}">
+                    <h3 style="color: ${b.color}">${b.name}</h3>
+                    <div class="coord-list">
+                        <div class="coord-full-width"><strong>Center[X,Z]:</strong> [${b.pos[0].toFixed(1)}, ${b.pos[2].toFixed(1)}] | <strong>Rot Y:</strong> ${b.rot[1].toFixed(3)} rad</div>
+                        <div class="coord-full-width"><hr style="border-color: #333; margin: 4px 0;" /></div>`;
+
+                cornersRel.forEach(c => {
+                    const rot = -b.rot[1];
+                    const rx = c.x * Math.cos(rot) - c.z * Math.sin(rot);
+                    const rz = c.x * Math.sin(rot) + c.z * Math.cos(rot);
+                    const fx = rx + b.pos[0];
+                    const fz = rz + b.pos[2];
+                    block += `<div><strong>${c.label}:</strong><br/>X=${fx.toFixed(1)}, Z=${fz.toFixed(1)}</div>`;
+                });
+
+                block += `</div></div>`;
+                html += block;
+            });
+            panel.innerHTML = html;
+
+            if (selectedBuilding) {
+                selectedControlsDiv.classList.add('visible');
+                selectedNameSpan.innerText = selectedBuilding.name;
+                rotSlider.value = selectedBuilding.rot[1];
+                rotValue.innerText = selectedBuilding.rot[1].toFixed(3);
+            } else {
+                selectedControlsDiv.classList.remove('visible');
+            }
+        }
+
+        function resizeCanvas() {
+            const wrapper = document.querySelector('.map-wrapper');
+            canvas.width = wrapper.clientWidth;
+            canvas.height = wrapper.clientHeight;
+            drawMap();
+        }
+        window.addEventListener('resize', resizeCanvas);
+
+        canvas.addEventListener('mousedown', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+            const world = screenToWorld(mouseX, mouseY);
+
+            for (let i = BUILDINGS.length - 1; i >= 0; i--) {
+                const b = BUILDINGS[i];
+                if (isPointInsideBuilding(world.x, world.z, b)) {
+                    selectedBuilding = b;
+                    isDragging = true;
+                    dragOffsetX = world.x - b.pos[0];
+                    dragOffsetZ = world.z - b.pos[2];
+                    updatePanel();
+                    break;
+                }
+            }
+        });
+
+        canvas.addEventListener('mousemove', (e) => {
+            if (!isDragging || !selectedBuilding) return;
+            const rect = canvas.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+            const world = screenToWorld(mouseX, mouseY);
+            selectedBuilding.pos[0] = world.x - dragOffsetX;
+            selectedBuilding.pos[2] = world.z - dragOffsetZ;
+            drawMap();
+            updatePanel();
+            broadcastLayout();
+        });
+
+        canvas.addEventListener('mouseup', () => {
+            if (isDragging) {
+                isDragging = false;
+                drawMap();
+                updatePanel();
+            }
+        });
+
+        canvas.addEventListener('mouseleave', () => {
+            if (isDragging) {
+                isDragging = false;
+                drawMap();
+                updatePanel();
+            }
+        });
+
+        rotSlider.addEventListener('input', (e) => {
+            if (!selectedBuilding) return;
+            const val = parseFloat(e.target.value);
+            selectedBuilding.rot[1] = val;
+            rotValue.innerText = val.toFixed(3);
+            drawMap();
+            updatePanel();
+            broadcastLayout();
+        });
+
+        window.exportData = function () {
+            console.log("==== CURRENT BUILDING DATA ====");
+            console.log(JSON.stringify(BUILDINGS, null, 2));
+            alert('✅ JSON exported to console (F12 → Console)');
+        };
+
+        window.saveToStorage = saveToStorage;
+        window.resetToDefault = resetToDefault;
+
+        window.saveAsHTML = function () {
+            // This function itself is not needed in the generated file,
+            // but we keep it for consistency. The actual saveAsHTML in the parent
+            // file triggers download; here we just call the same function.
+            // However, to avoid recursion, we override it.
+            console.log("Save as HTML is available from the original file.");
+        };
+
+        // Initialise
+        loadFromStorage();
+        window.addEventListener('load', () => {
+            resizeCanvas();
+            updatePanel();
+            broadcastLayout();
+        });
+    </script>
+</body>
+
+</html>

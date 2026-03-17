@@ -18,9 +18,9 @@ export const NavigationTab: React.FC<NavigationTabProps> = ({ selectedBuildingId
     const distanceMeters = selectedBuildingId ? 240 : 0; // Mock distance
 
     const speeds = {
-        walk: 1.4,
-        cycle: 5.0,
-        car: 10.0
+        walk: 2.8,
+        cycle: 10.0,
+        car: 20.0
     };
 
     const speed = speeds[transportMode] || 1.4;

@@ -88,9 +88,9 @@ export const RealMap: React.FC<RealMapProps> = ({ selectedBuildingId, onSelectBu
             const distMeters = Math.sqrt(dx * dx + dy * dy);
 
             // Calculate ETA
-            let speedMetersPerSec = 5; // Walk
-            if (transportMode === 'cycle') speedMetersPerSec = 12;
-            if (transportMode === 'car') speedMetersPerSec = 25;
+            let speedMetersPerSec = 10; // Walk (2x speed)
+            if (transportMode === 'cycle') speedMetersPerSec = 24;
+            if (transportMode === 'car') speedMetersPerSec = 50;
 
             const timeSeconds = distMeters / speedMetersPerSec;
             setEtaMinutes(Math.max(1, Math.ceil(timeSeconds / 60)));
@@ -120,10 +120,10 @@ export const RealMap: React.FC<RealMapProps> = ({ selectedBuildingId, onSelectBu
         // Approximate: 1 degree latitude is ~111km. 
         // 1 meter = 1 / 111000 degrees ≈ 0.000009 degrees
         const metersPerDegree = 111000;
-        let speedMetersPerSec = 5; // Walk
+        let speedMetersPerSec = 10; // Walk (2x speed)
 
-        if (transportMode === 'cycle') speedMetersPerSec = 12;
-        if (transportMode === 'car') speedMetersPerSec = 25;
+        if (transportMode === 'cycle') speedMetersPerSec = 24;
+        if (transportMode === 'car') speedMetersPerSec = 50;
 
         // Convert speed to degrees per frame (assuming ~60fps)
         return (speedMetersPerSec / 60) / metersPerDegree;

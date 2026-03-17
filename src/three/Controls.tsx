@@ -6,9 +6,9 @@ import * as THREE from 'three';
 import { TransportMode } from '../components/TransportSelector';
 
 const BASE_SPEED = {
-    walk: 5,
-    cycle: 12,
-    car: 25
+    walk: 10,
+    cycle: 24,
+    car: 50
 };
 
 const BASE_HEIGHT = {

@@ -8,6 +8,7 @@ const GPSTab = lazy(() => import('./pages/GPSTab').then(m => ({ default: m.GPSTa
 const WifiTab = lazy(() => import('./pages/WifiTab').then(m => ({ default: m.WifiTab })));
 const ARPage = lazy(() => import('./pages/ARPage').then(m => ({ default: m.ARPage })));
 const ThesisTab = lazy(() => import('./pages/ThesisTab').then(m => ({ default: m.ThesisTab })));
+const LayoutToolTab = lazy(() => import('./pages/LayoutToolTab').then(m => ({ default: m.LayoutToolTab })));
 
 const App: React.FC = () => {
     const [activeTab, setActiveTab] = useState('voxel');
@@ -22,6 +23,7 @@ const App: React.FC = () => {
             case 'wifi': return <WifiTab />;
             case 'ar': return <ARPage />;
             case 'thesis': return <ThesisTab />;
+            case 'layout': return <LayoutToolTab />;
             default: return <VoxelCampus selectedBuildingId={selectedBuildingId} onSelectBuilding={setSelectedBuildingId} transportMode={transportMode} onTransportModeChange={setTransportMode} />;
         }
     };

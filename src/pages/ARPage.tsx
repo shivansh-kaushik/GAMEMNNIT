@@ -3,6 +3,10 @@ import { CAMPUS_BUILDINGS } from '../navigation/buildings';
 import { readSensors, ARSensors } from '../ar/arEngine';
 import { buildARPath, remainingDistance, ARNavWaypoint } from '../ar/arNavigation';
 import { AIAssistantPanel } from '../ai/AIAssistantPanel'; // AI layer — does not touch AR logic
+import { useHeadingSmoothing } from '../hooks/useHeadingSmoothing';
+import { useNavigationConfidence } from '../hooks/useNavigationConfidence';
+import { useVoiceGuidance } from '../hooks/useVoiceGuidance';
+import { MiniMapOverlay } from '../components/MiniMapOverlay';
 
 /**
  * ARPage — Augmented Reality Navigation Mode
@@ -17,9 +21,20 @@ export const ARPage: React.FC = () => {
     const [cameraError, setCameraError] = useState<string | null>(null);
     const [sensors, setSensors] = useState<ARSensors | null>(null);
     const [destId, setDestId] = useState<string | null>(null);
+    const [pendingDestId, setPendingDestId] = useState<string | null>(null);
     const [waypoints, setWaypoints] = useState<ARNavWaypoint[]>([]);
     const [distanceLeft, setDistanceLeft] = useState<number | null>(null);
     const [arActive, setArActive] = useState(false);
+    const [headingOffset, setHeadingOffset] = useState(0);
+
+    const smoothedHeading = useHeadingSmoothing(sensors?.compassBearing ?? 0, 0.15, 150);
+    const confidence = useNavigationConfidence(sensors?.gpsLat ?? 0, sensors?.gpsLon ?? 0, destId);
+
+    // Voice guidance integration
+    const distanceToNextTurn = waypoints.length > 0 ? waypoints[0].distFromPrev : 0;
+    const isFinalDest = waypoints.length <= 1;
+    const turnInstruction = waypoints.length > 0 ? (waypoints[0].label || "Continue straight") : "";
+    useVoiceGuidance(distanceToNextTurn, turnInstruction, isFinalDest);
 
     // ---------- Camera ----------
     const startCamera = useCallback(async () => {
@@ -81,7 +96,7 @@ export const ARPage: React.FC = () => {
 
             if (waypoints.length > 0) {
                 // Draw navigation arrows along the path
-                const bearing = sensors?.compassBearing ?? 0;
+                const bearing = (smoothedHeading + headingOffset + 360) % 360;
                 const arrowCount = Math.min(waypoints.length, 6);
 
                 for (let i = 0; i < arrowCount; i++) {
@@ -143,18 +158,35 @@ export const ARPage: React.FC = () => {
                     ctx.fillStyle = '#aaa';
                     ctx.font = '13px Inter, sans-serif';
                     ctx.fillText(`${Math.round(distanceLeft)} m away`, cx, by + 44);
+                    
+                    // Confidence Pill Overlay
+                    let confColor = '#00ff88';
+                    if (confidence === 'Slightly Off') confColor = '#eab308';
+                    if (confidence === 'Recalculating') confColor = '#ef4444';
+                    
+                    ctx.font = 'bold 12px Inter, sans-serif';
+                    const confTw = ctx.measureText(confidence).width;
+                    ctx.fillStyle = 'rgba(0,0,0,0.8)';
+                    roundRect(ctx, cx - confTw/2 - 10, by + 60, confTw + 20, 24, 12);
+                    ctx.fill();
+                    ctx.fillStyle = confColor;
+                    ctx.fillText(confidence, cx, by + 76);
+
                     ctx.restore();
                 }
             }
 
-            // Compass bearing indicator
-            if (sensors) {
-                ctx.save();
-                ctx.font = '12px monospace';
-                ctx.fillStyle = '#aaa';
-                ctx.textAlign = 'left';
-                ctx.fillText(`🧭 ${Math.round(sensors.compassBearing)}°  📍 ${sensors.gpsLat.toFixed(5)}, ${sensors.gpsLon.toFixed(5)}`, 16, canvas.height - 16);
-                ctx.restore();
+            // Error Handling UI
+            if (sensors && sensors.gpsLat === 25.4920 && sensors.gpsLon === 81.8670) {
+                 ctx.save();
+                 ctx.fillStyle = 'rgba(239,68,68,0.9)';
+                 roundRect(ctx, cx - 100, 100, 200, 30, 8);
+                 ctx.fill();
+                 ctx.fillStyle = '#fff';
+                 ctx.textAlign = 'center';
+                 ctx.font = '13px Inter, sans-serif';
+                 ctx.fillText('Poor GPS accuracy. Move to open area.', cx, 120);
+                 ctx.restore();
             }
 
             animRef.current = requestAnimationFrame(draw);
@@ -176,11 +208,28 @@ export const ARPage: React.FC = () => {
                 style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', opacity: arActive ? 1 : 0 }}
             />
 
-            {/* AR Canvas overlay */}
-            <canvas
-                ref={canvasRef}
-                style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none' }}
-            />
+            {/* Distance-Aware UI Transition */}
+            {arActive && distanceLeft && distanceLeft > 100 ? (
+                <div style={{ position: 'absolute', inset: 0, zIndex: 5, background: 'transparent' }}>
+                    {/* Full map representation for far distances */}
+                    {sensors && <MiniMapOverlay lat={sensors.gpsLat} lon={sensors.gpsLon} destLat={CAMPUS_BUILDINGS.find(b => b.id === destId)?.latitude} destLon={CAMPUS_BUILDINGS.find(b => b.id === destId)?.longitude} />}
+                    <div style={{ position: 'absolute', bottom: '120px', width: '100%', textAlign: 'center', color: '#fff', fontSize: '18px', fontWeight: 'bold', textShadow: '0 2px 4px rgba(0,0,0,0.8)' }}>
+                        Follow the Map. AR will activate within 100m.
+                    </div>
+                </div>
+            ) : (
+                <>
+                    {/* AR Canvas overlay */}
+                    <canvas
+                        ref={canvasRef}
+                        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none' }}
+                    />
+                    {/* Floating Mini Map Overlay for close distances */}
+                    {arActive && sensors && (
+                        <MiniMapOverlay lat={sensors.gpsLat} lon={sensors.gpsLon} destLat={destId ? CAMPUS_BUILDINGS.find(b => b.id === destId)?.latitude : undefined} destLon={destId ? CAMPUS_BUILDINGS.find(b => b.id === destId)?.longitude : undefined} />
+                    )}
+                </>
+            )}
 
             {/* Top Controls */}
             <div style={{ position: 'absolute', top: '20px', left: '50%', transform: 'translateX(-50%)', zIndex: 10, display: 'flex', gap: '12px', alignItems: 'center' }}>
@@ -196,12 +245,12 @@ export const ARPage: React.FC = () => {
             </div>
 
             {/* Destination Picker */}
-            {arActive && (
+            {arActive && !destId && (
                 <div style={{ position: 'absolute', top: '75px', left: '50%', transform: 'translateX(-50%)', zIndex: 10, background: 'rgba(0,0,0,0.75)', padding: '12px 16px', borderRadius: '10px', border: '1px solid #333', minWidth: '260px' }}>
                     <div style={{ color: '#aaa', fontSize: '11px', marginBottom: '6px', textTransform: 'uppercase' }}>Navigate to</div>
                     <select
-                        value={destId || ''}
-                        onChange={e => setDestId(e.target.value || null)}
+                        value={pendingDestId || ''}
+                        onChange={e => setPendingDestId(e.target.value || null)}
                         style={{ width: '100%', background: '#111', color: '#fff', border: '1px solid #444', borderRadius: '6px', padding: '8px', fontSize: '13px', cursor: 'pointer' }}
                     >
                         <option value=''>— Select Destination —</option>
@@ -212,6 +261,36 @@ export const ARPage: React.FC = () => {
                         ))}
                     </select>
                 </div>
+            )}
+
+            {/* Destination Confirmation Modal */}
+            {arActive && pendingDestId && !destId && (
+                <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <div style={{ background: '#1a1a1a', padding: '24px', borderRadius: '16px', maxWidth: '320px', width: '90%', textAlign: 'center', border: '1px solid #333' }}>
+                        <h3 style={{ color: '#fff', margin: '0 0 12px 0' }}>Confirm Destination</h3>
+                        <p style={{ color: '#aaa', fontSize: '14px', marginBottom: '24px' }}>
+                            Are you navigating to <strong>{CAMPUS_BUILDINGS.find(b => b.id === pendingDestId)?.name}</strong>?
+                        </p>
+                        <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
+                            <button onClick={() => setPendingDestId(null)} style={btnStyle('#333', '#fff')}>Cancel</button>
+                            <button onClick={() => { setDestId(pendingDestId); setPendingDestId(null); }} style={btnStyle('#00ff88', '#000')}>Start</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Compass Calibration Button */}
+            {arActive && (
+                <button 
+                    onClick={() => {
+                        alert("Move phone in a figure-8 motion to calibrate the compass.");
+                        if (sensors) setHeadingOffset(-sensors.compassBearing);
+                    }} 
+                    style={{ position: 'absolute', bottom: '20px', right: '20px', background: 'rgba(0,0,0,0.6)', border: '1px solid #444', color: '#fff', padding: '10px', borderRadius: '50%', cursor: 'pointer', zIndex: 10 }}
+                    title="Calibrate Compass"
+                >
+                    🧭
+                </button>
             )}
 
             {/* Camera error */}

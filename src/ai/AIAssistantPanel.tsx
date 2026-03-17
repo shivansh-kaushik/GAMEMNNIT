@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
-import { queryLLM } from './llmClient';
+import { queryLLM, ChatMessage } from './llmClient';
 import { buildNavigationPrompt, parseIntent, NavIntent } from './intentParser';
 import { startListening, stopListening, speak, isSpeechAvailable } from './voiceInput';
 import { startVoiceGuidance } from './voiceGuidance';
@@ -33,10 +33,20 @@ export const AIAssistantPanel: React.FC<AIAssistantPanelProps> = ({
 }) => {
     const [status, setStatus] = useState<PanelStatus>('idle');
     const [query, setQuery] = useState('');
-    const [reply, setReply] = useState('');
+    const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
     const [guidanceText, setGuidanceText] = useState('');
     const [expanded, setExpanded] = useState(false);
+    const [activeDestId, setActiveDestId] = useState<string | null>(null);
+    
     const guidanceSession = useRef<{ stop: () => void } | null>(null);
+    const chatEndRef = useRef<HTMLDivElement>(null);
+
+    // Auto-scroll chat to bottom
+    useEffect(() => {
+        if (chatEndRef.current) {
+            chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
+        }
+    }, [chatHistory, status]);
 
     // ── Keep refs up-to-date so voiceGuidance can always read fresh state ──
     const sensorsRef = useRef(sensors);
@@ -90,27 +100,46 @@ export const AIAssistantPanel: React.FC<AIAssistantPanelProps> = ({
     const handleIntent = useCallback((intent: NavIntent) => {
         if (intent.destinationId) {
             onNavigate(intent.destinationId);
+            setActiveDestId(intent.destinationId); // track for system prompt context
             speak(intent.reply ?? `Navigating to ${intent.destinationName}.`);
-            setReply(`✅ ${intent.reply}`);
             setStatus('guiding'); // guidance loop will kick in once waypoints arrive
         } else {
             const msg = intent.reply ?? 'Could not find that location.';
             speak(msg);
-            setReply(`ℹ️ ${msg}`);
-            setStatus('error');
+            setStatus('idle');
         }
+        
+        // Append AI reply to chat history
+        setChatHistory(prev => [...prev, { role: 'model', parts: [{ text: intent.reply || 'Request processed.' }] }]);
     }, [onNavigate]);
 
     const runQuery = useCallback(async (text: string) => {
         if (!text.trim()) return;
-        setQuery(text);
-        setReply('');
+        setQuery('');
         setStatus('thinking');
 
-        const llmResult = await queryLLM(buildNavigationPrompt(text));
+        // Append user new message to history
+        const newUserMsg: ChatMessage = { role: 'user', parts: [{ text }] };
+        const updatedHistory = [...chatHistory, newUserMsg];
+        setChatHistory(updatedHistory);
+
+        // Build context-aware prompt
+        const sysPrompt = buildNavigationPrompt(sensorsRef.current, activeDestId);
+        
+        // Only send last 6 messages to prevent token bloat
+        const recentHistory = updatedHistory.slice(-6);
+
+        const llmResult = await queryLLM(recentHistory, sysPrompt);
+        
+        if (!llmResult.ok) {
+           setStatus('error');
+           setChatHistory(prev => [...prev, { role: 'model', parts: [{ text: `⚠️ ${llmResult.error || 'Network error'}` }] }]);
+           return;
+        }
+
         const intent = parseIntent(llmResult.text, text);
         handleIntent(intent);
-    }, [handleIntent]);
+    }, [chatHistory, handleIntent, activeDestId]);
 
     const handleVoice = useCallback(() => {
         if (status === 'listening') {
@@ -119,10 +148,12 @@ export const AIAssistantPanel: React.FC<AIAssistantPanelProps> = ({
             return;
         }
         setStatus('listening');
-        setReply('');
         startListening(
             (transcript) => { stopListening(); runQuery(transcript); },
-            (err) => { setReply(`⚠️ ${err}`); setStatus('error'); }
+            (err) => { 
+                setChatHistory(prev => [...prev, { role: 'model', parts: [{ text: `⚠️ Voice error: ${err}` }] }]);
+                setStatus('error'); 
+            }
         );
     }, [status, runQuery]);
 
@@ -196,55 +227,99 @@ export const AIAssistantPanel: React.FC<AIAssistantPanelProps> = ({
                         {statusLabel[status]}
                     </div>
 
-                    {/* Voice button */}
-                    {isSpeechAvailable() && (
-                        <button onClick={handleVoice} style={{
-                            padding: '10px', borderRadius: '10px', border: 'none',
-                            background: status === 'listening' ? '#f59e0b' : '#1e293b',
-                            color: '#fff', cursor: 'pointer', fontSize: '22px',
-                            boxShadow: status === 'listening' ? '0 0 16px #f59e0b' : 'none',
-                            transition: 'all 0.2s', width: '100%'
-                        }} title={status === 'listening' ? 'Stop' : 'Voice command'}>
-                            🎤 {status === 'listening' ? 'Listening… (tap to stop)' : 'Voice Command'}
-                        </button>
+                    {/* Chat History View (Scrollable) */}
+                    <div style={{
+                        flex: 1, maxHeight: '250px', overflowY: 'auto',
+                        display: 'flex', flexDirection: 'column', gap: '8px',
+                        paddingRight: '6px'
+                    }}>
+                        {chatHistory.length === 0 && (
+                            <div style={{ fontSize: '12px', color: '#64748b', textAlign: 'center', margin: '20px 0' }}>
+                                How can I help you navigate the MNNIT Campus today?
+                            </div>
+                        )}
+                        {chatHistory.map((msg, i) => (
+                            <div key={i} style={{
+                                alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start',
+                                maxWidth: '85%',
+                                background: msg.role === 'user' ? '#0f172a' : '#1e293b',
+                                color: '#e2e8f0',
+                                padding: '10px 14px',
+                                borderRadius: msg.role === 'user' ? '12px 12px 0 12px' : '12px 12px 12px 0',
+                                fontSize: '13px',
+                                lineHeight: 1.4,
+                                border: `1px solid ${msg.role === 'user' ? '#334155' : '#475569'}`
+                            }}>
+                                {msg.parts[0].text.replace(/\{.*\}/, '') /* hide JSON intent from UI layer */}
+                            </div>
+                        ))}
+                        
+                        {/* Typing indicator */}
+                        {status === 'thinking' && (
+                            <div style={{
+                                alignSelf: 'flex-start', background: '#1e293b', padding: '10px 14px',
+                                borderRadius: '12px 12px 12px 0', fontSize: '13px', color: '#94a3b8',
+                                display: 'flex', gap: '4px', alignItems: 'center'
+                            }}>
+                                <span className="typing-dot" style={{ animationDelay: '0s' }}>●</span>
+                                <span className="typing-dot" style={{ animationDelay: '0.2s' }}>●</span>
+                                <span className="typing-dot" style={{ animationDelay: '0.4s' }}>●</span>
+                            </div>
+                        )}
+                        <div ref={chatEndRef} />
+                    </div>
+
+                    {/* Quick Suggestion Chips */}
+                    {status === 'idle' && (
+                        <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '4px', scrollbarWidth: 'none' }}>
+                            {["Where am I?", "Find CSED Building", "Take me to Main Gate"].map(chip => (
+                                <button key={chip} onClick={() => runQuery(chip)} style={{
+                                    flexShrink: 0, padding: '6px 10px', background: '#0f172a',
+                                    border: '1px solid #334155', borderRadius: '16px', color: '#94a3b8',
+                                    fontSize: '11px', cursor: 'pointer', transition: 'all 0.2s'
+                                }}>
+                                    {chip}
+                                </button>
+                            ))}
+                        </div>
                     )}
 
-                    {/* Text query */}
-                    <form onSubmit={handleTextSubmit} style={{ display: 'flex', gap: '8px' }}>
+                    {/* Text input form */}
+                    <form onSubmit={handleTextSubmit} style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
                         <input
                             value={query}
                             onChange={e => setQuery(e.target.value)}
                             placeholder='"Take me to CSE dept"'
                             style={{
-                                flex: 1, padding: '8px 12px', background: '#111', color: '#fff',
-                                border: '1px solid #333', borderRadius: '8px', fontSize: '12px', outline: 'none'
+                                flex: 1, padding: '10px 14px', background: '#0f172a', color: '#fff',
+                                border: '1px solid #334155', borderRadius: '20px', fontSize: '13px', outline: 'none'
                             }}
                             disabled={status === 'thinking' || status === 'listening'}
                         />
                         <button type='submit'
-                            disabled={status === 'thinking' || status === 'listening'}
+                            disabled={status === 'thinking' || status === 'listening' || !query.trim()}
                             style={{
-                                padding: '8px 14px', background: '#00ff88', color: '#000',
-                                border: 'none', borderRadius: '8px', fontWeight: 'bold',
-                                cursor: 'pointer', fontSize: '12px'
+                                padding: '0 16px', background: !query.trim() ? '#334155' : '#00ff88', color: '#000',
+                                border: 'none', borderRadius: '20px', fontWeight: 'bold',
+                                cursor: !query.trim() ? 'not-allowed' : 'pointer', fontSize: '13px',
+                                transition: 'all 0.2s'
                             }}>
-                            Ask
+                            ↑
                         </button>
                     </form>
 
-                    {/* Reply */}
-                    {reply && (
-                        <div style={{
-                            background: '#0f172a', borderRadius: '8px', padding: '10px',
-                            fontSize: '12px', color: '#e2e8f0', lineHeight: 1.5,
-                            border: `1px solid ${status === 'done' ? '#a78bfa' : status === 'error' ? '#ef4444' : '#333'}`
-                        }}>
-                            {reply}
-                        </div>
-                    )}
-
-                    <div style={{ fontSize: '10px', color: '#475569', textAlign: 'center' }}>
-                        Google Gemini 1.5 · Web Speech API · Live GPS · A* Route
+                    <div style={{ fontSize: '10px', color: '#475569', textAlign: 'center', marginTop: '4px' }}>
+                        Memory Enabled · Web Speech API · Live GPS · A* Route (Gemini 3.0)
+                        <style>
+                            {`
+                            @keyframes typing-dot {
+                                0% { opacity: 0.3; transform: translateY(0px); }
+                                50% { opacity: 1; transform: translateY(-2px); }
+                                100% { opacity: 0.3; transform: translateY(0px); }
+                            }
+                            .typing-dot { animation: typing-dot 1.2s infinite ease-in-out; }
+                            `}
+                        </style>
                     </div>
                 </div>
             )}

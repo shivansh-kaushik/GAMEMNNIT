@@ -1,9 +1,58 @@
-import React from 'react';
-import { GraduationCap, FileText, Award, MapPin, Cpu, Compass, Wifi } from 'lucide-react';
+import React, { useEffect, useRef } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import rehypeRaw from 'rehype-raw';
+import mermaid from 'mermaid';
+import readmeText from '../../README.md?raw';
+
+const Mermaid = ({ text }: { text: string }) => {
+    const [svgContent, setSvgContent] = React.useState<string>('');
+    const renderedRef = useRef(false);
+
+    useEffect(() => {
+        if (renderedRef.current) return;
+        renderedRef.current = true;
+
+        const renderDiagram = async () => {
+            if (!text) return;
+
+            try {
+                mermaid.initialize({
+                    startOnLoad: false,
+                    theme: 'dark',
+                    securityLevel: 'loose',
+                });
+
+                const id = `mermaid-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+                const { svg } = await mermaid.render(id, text);
+                setSvgContent(svg);
+            } catch (err) {
+                console.error("Mermaid error:", err);
+                setSvgContent(`<div style="color:#fb7185;">Error rendering diagram</div>`);
+            }
+        };
+
+        renderDiagram();
+    }, [text]);
+
+    return (
+        <div
+            style={{
+                display: 'flex',
+                justifyContent: 'center',
+                margin: '30px 0',
+                background: '#0f172a',
+                padding: '20px',
+                borderRadius: '8px',
+                overflowX: 'auto'
+            }}
+            dangerouslySetInnerHTML={{ __html: svgContent }}
+        />
+    );
+};
 
 export const ThesisTab: React.FC = () => {
-    const architectureDiagram = '[Digital Twin Layer] -> [Routing Engine (A*)] -> [AR Overlay] -> [User Interface]';
-
     return (
         <div style={{
             width: '100%',
@@ -12,272 +61,115 @@ export const ThesisTab: React.FC = () => {
             color: '#e2e8f0',
             overflowY: 'auto',
             fontFamily: 'Inter, system-ui, sans-serif',
-            paddingBottom: '100px',
+            padding: '40px 24px 100px 24px',
         }}>
-            {/* Hero Header */}
             <div style={{
-                background: 'linear-gradient(180deg, rgba(0,255,136,0.12) 0%, rgba(0,0,0,0) 100%)',
-                padding: '60px 24px 40px',
-                textAlign: 'center',
-                borderBottom: '1px solid #1e293b'
-            }}>
-                <GraduationCap size={48} color="#00ff88" style={{ marginBottom: '16px' }} />
-                <h1 style={{
-                    fontSize: 'clamp(18px, 3vw, 26px)',
-                    fontWeight: 800,
-                    lineHeight: 1.3,
-                    color: '#fff',
-                    maxWidth: '820px',
-                    margin: '0 auto 16px auto'
-                }}>
-                    AR-Based Smart Campus Navigation Using Geospatial Intelligence and Digital Twin Technology
-                </h1>
-                <div style={{ fontSize: '15px', color: '#94a3b8' }}>
-                    <strong style={{ color: '#fff' }}>Shivansh Kaushik</strong> &nbsp;|&nbsp; M.Tech Thesis
-                </div>
-                <div style={{ fontSize: '13px', color: '#475569', marginTop: '6px' }}>
-                    Motilal Nehru National Institute of Technology (MNNIT) Allahabad
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'center', gap: '10px', flexWrap: 'wrap', marginTop: '20px' }}>
-                    {['React 18', 'Three.js', 'AR WebXR', 'Gemini 1.5', 'Mapbox GL JS', 'A* Search'].map(tag => (
-                        <span key={tag} style={{
-                            background: 'rgba(0,255,136,0.1)',
-                            border: '1px solid rgba(0,255,136,0.3)',
-                            color: '#00ff88',
-                            padding: '4px 12px',
-                            borderRadius: '20px',
-                            fontSize: '11px',
-                            fontWeight: 600
-                        }}>{tag}</span>
-                    ))}
-                </div>
-            </div>
-
-            <div style={{ maxWidth: '860px', margin: '0 auto', padding: '48px 24px' }}>
-
-                {/* Abstract */}
-                <section style={{ marginBottom: '48px' }}>
-                    <h2 style={headingStyle}><Award size={18} style={{ marginRight: '10px', color: '#00ff88' }} /> 1. Abstract</h2>
-                    <p style={paraStyle}>
-                        This project presents the development of a smart campus navigation system combining geospatial mapping,
-                        augmented reality (AR), and AI-driven human interaction. The system assists users in navigating complex
-                        campus environments by grounding spatial guidance within a real-time digital twin representation of the campus.
-                    </p>
-                    <p style={paraStyle}>
-                        The routing engine uses the <strong style={{ color: '#e2e8f0' }}>A* pathfinding algorithm</strong> over a
-                        campus-scale graph. GPS handles outdoor positioning while barometric altimetry and WiFi RSSI fingerprinting
-                        support indoor localization. A locally hosted LLM (now powered by <strong style={{ color: '#e2e8f0' }}>Google Gemini 1.5</strong>) interprets voice
-                        commands and maps them to navigation intents consumed by the routing engine.
-                    </p>
-                    <blockquote style={{
-                        borderLeft: '3px solid #00ff88',
-                        paddingLeft: '16px',
-                        margin: '20px 0',
-                        color: '#94a3b8',
-                        fontStyle: 'italic',
-                        fontSize: '15px'
-                    }}>
-                        "The prototype, validated on the MNNIT Allahabad campus dataset, demonstrates that the convergence of
-                        digital twin visualization, WebXR-based AR, and on-device AI interaction is a viable framework for
-                        next-generation campus wayfinding."
-                    </blockquote>
-                </section>
-
-                <hr style={hrStyle} />
-
-                {/* System Architecture */}
-                <section style={{ marginBottom: '48px' }}>
-                    <h2 style={headingStyle}><Cpu size={18} style={{ marginRight: '10px', color: '#00ff88' }} /> 2. System Architecture</h2>
-                    <p style={paraStyle}>
-                        The architecture is modular and decoupled, separating visualization, routing, sensor integration, and AI
-                        inference so that heavy computations do not block real-time navigation.
-                    </p>
-                    <div style={codeBoxStyle}>
-                        <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
-                            {architectureDiagram}
-                        </pre>
-                    </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '12px', marginTop: '20px' }}>
-                        {[
-                            { label: 'Digital Twin Layer', desc: 'Three.js 3D campus model from OSM data' },
-                            { label: 'Navigation Engine', desc: 'A* pathfinding on GeoJSON graph' },
-                            { label: 'AR Viz Layer', desc: 'WebXR camera overlay with GPS anchoring' },
-                            { label: 'AI Assistant', desc: 'Gemini 1.5 Flash for NL command parsing' },
-                        ].map(card => (
-                            <div key={card.label} style={cardStyle}>
-                                <div style={{ fontSize: '12px', fontWeight: 700, color: '#00ff88', marginBottom: '6px' }}>{card.label}</div>
-                                <div style={{ fontSize: '12px', color: '#64748b' }}>{card.desc}</div>
-                            </div>
-                        ))}
-                    </div>
-                </section>
-
-                <hr style={hrStyle} />
-
-                {/* Navigation Engine */}
-                <section style={{ marginBottom: '48px' }}>
-                    <h2 style={headingStyle}><Compass size={18} style={{ marginRight: '10px', color: '#00ff88' }} /> 3. Navigation Engine (A* Search)</h2>
-                    <p style={paraStyle}>
-                        Each <strong style={{ color: '#e2e8f0' }}>node</strong> represents a spatial waypoint (pathway intersection, building entrance).
-                        Each <strong style={{ color: '#e2e8f0' }}>edge</strong> represents a traversable connection.
-                    </p>
-                    <div style={{ ...codeBoxStyle, textAlign: 'center', fontSize: '20px', letterSpacing: '2px', fontFamily: 'Georgia, serif' }}>
-                        f(n) = g(n) + h(n)
-                    </div>
-                    <p style={{ ...paraStyle, fontSize: '13px', color: '#475569' }}>
-                        Where <em>g(n)</em> is the exact cost from origin to node n, and <em>h(n)</em> is the Euclidean distance heuristic to the goal.
-                    </p>
-
-                    <div style={{ background: '#111', borderRadius: '10px', overflow: 'hidden', border: '1px solid #1e293b', marginTop: '16px' }}>
-                        <div style={{ padding: '10px 16px', borderBottom: '1px solid #1e293b', fontSize: '11px', color: '#475569', fontFamily: 'monospace' }}>
-                            src/navigation/astar.ts
-                        </div>
-                        <pre style={{ margin: 0, padding: '16px', fontSize: '13px', color: '#94a3b8', fontFamily: 'monospace', overflowX: 'auto' }}>
-                            {`function heuristic(a: Node, b: Node): number {
-  return Math.sqrt((a.x - b.x) ** 2 + (a.z - b.z) ** 2);
-}`}
-                        </pre>
-                    </div>
-                </section>
-
-                <hr style={hrStyle} />
-
-                {/* Indoor Positioning */}
-                <section style={{ marginBottom: '48px' }}>
-                    <h2 style={headingStyle}><Wifi size={18} style={{ marginRight: '10px', color: '#00ff88' }} /> 4. Indoor Positioning</h2>
-                    <p style={paraStyle}>
-                        GPS signal degrades inside reinforced concrete structures. A hybrid sensor fusion approach handles indoor navigation:
-                    </p>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginTop: '16px' }}>
-                        <div style={cardStyle}>
-                            <div style={{ fontSize: '13px', fontWeight: 700, color: '#00ff88', marginBottom: '8px' }}>Barometric Altimetry</div>
-                            <p style={{ fontSize: '13px', color: '#64748b', margin: 0, lineHeight: 1.6 }}>
-                                Floor height from ambient pressure. A change of 3m triggers a floor transition event.
-                            </p>
-                        </div>
-                        <div style={cardStyle}>
-                            <div style={{ fontSize: '13px', fontWeight: 700, color: '#00ff88', marginBottom: '8px' }}>WiFi RSSI Fingerprinting</div>
-                            <p style={{ fontSize: '13px', color: '#64748b', margin: 0, lineHeight: 1.6 }}>
-                                Euclidean distance matching of live RSSI arrays against pre-calibrated floor signatures.
-                            </p>
-                        </div>
-                    </div>
-                </section>
-
-                <hr style={hrStyle} />
-
-                {/* Performance Metrics */}
-                <section style={{ marginBottom: '48px' }}>
-                    <h2 style={headingStyle}><FileText size={18} style={{ marginRight: '10px', color: '#00ff88' }} /> 5. Performance Metrics</h2>
-                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-                        <thead>
-                            <tr style={{ borderBottom: '1px solid #1e293b' }}>
-                                <th style={thStyle}>Metric</th>
-                                <th style={thStyle}>Achieved</th>
-                                <th style={thStyle}>Target</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {[
-                                ['A* Route Generation', '< 50 ms', '< 100 ms'],
-                                ['AR Rendering Frame Rate', '30–60 FPS', '≥ 30 FPS'],
-                                ['GPS Accuracy', '~5–10 m', '± 5 m'],
-                                ['Floor Detection', '± 1 floor', '± 1 floor'],
-                                ['AI Intent Latency (Gemini)', '~400 ms', '< 1.5 s'],
-                            ].map(([metric, achieved, target]) => (
-                                <tr key={metric} style={{ borderBottom: '1px solid #0f172a' }}>
-                                    <td style={tdStyle}>{metric}</td>
-                                    <td style={{ ...tdStyle, color: '#00ff88', fontWeight: 600 }}>{achieved}</td>
-                                    <td style={{ ...tdStyle, color: '#475569' }}>{target}</td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </section>
-
-                <hr style={hrStyle} />
-
-                {/* Research Contributions */}
-                <section style={{ marginBottom: '48px' }}>
-                    <h2 style={headingStyle}><MapPin size={18} style={{ marginRight: '10px', color: '#00ff88' }} /> 6. Research Contributions</h2>
-                    {[
-                        ['Pure-web AR Navigation', 'A fully browser-native AR direction system decoupled from proprietary OS frameworks, using WebXR and HTML5 Canvas.'],
-                        ['Discrete-to-Generative AI Bridge', 'A* graph outputs fed into Gemini 1.5 Flash, enabling natural language reasoning over structured spatial data.'],
-                        ['Hybrid Indoor-Outdoor Framework', 'A unified client-side system combining WiFi/barometric indoor math with outdoor OSM and Mapbox GIS data.'],
-                    ].map(([title, desc]) => (
-                        <div key={title} style={{ display: 'flex', gap: '16px', marginBottom: '16px', padding: '16px', background: '#0f172a', borderRadius: '10px', border: '1px solid #1e293b' }}>
-                            <div style={{ color: '#00ff88', fontWeight: 800, fontSize: '20px', lineHeight: 1 }}>→</div>
-                            <div>
-                                <div style={{ color: '#e2e8f0', fontWeight: 700, fontSize: '14px', marginBottom: '4px' }}>{title}</div>
-                                <div style={{ color: '#64748b', fontSize: '13px', lineHeight: 1.6 }}>{desc}</div>
-                            </div>
-                        </div>
-                    ))}
-                </section>
-
-                {/* Footer */}
-                <div style={{ textAlign: 'center', color: '#334155', fontSize: '12px', paddingTop: '40px', borderTop: '1px solid #1e293b' }}>
-                    <p style={{ margin: '4px 0' }}>Submitted in partial fulfillment of the requirements for the degree of Master of Technology</p>
-                    <p style={{ margin: '4px 0' }}><strong style={{ color: '#475569' }}>Motilal Nehru National Institute of Technology Allahabad</strong></p>
-                </div>
+                maxWidth: '900px',
+                margin: '0 auto',
+                background: '#111827',
+                padding: '40px 50px',
+                borderRadius: '12px',
+                border: '1px solid #1e293b',
+                boxShadow: '0 10px 40px rgba(0,0,0,0.6)',
+            }} className="thesis-markdown">
+                <style>{`
+                    .thesis-markdown h1, .thesis-markdown h2, .thesis-markdown h3, .thesis-markdown h4 {
+                        color: #00ff88;
+                        margin-top: 32px;
+                        margin-bottom: 16px;
+                        line-height: 1.3;
+                    }
+                    .thesis-markdown h1 { font-size: 2.2em; border-bottom: 1px solid #1e293b; padding-bottom: 12px; margin-top: 0; text-align: center; }
+                    .thesis-markdown h2 { font-size: 1.8em; border-bottom: 1px solid #1e293b; padding-bottom: 8px; }
+                    .thesis-markdown h3 { font-size: 1.4em; color: #e2e8f0; }
+                    .thesis-markdown p { line-height: 1.8; margin-bottom: 16px; color: #cbd5e1; font-size: 15px; }
+                    .thesis-markdown ul, .thesis-markdown ol { padding-left: 24px; margin-bottom: 20px; color: #cbd5e1; line-height: 1.7; font-size: 15px;}
+                    .thesis-markdown li { margin-bottom: 8px; }
+                    .thesis-markdown a { color: #38bdf8; text-decoration: none; }
+                    .thesis-markdown a:hover { text-decoration: underline; color: #7dd3fc; }
+                    .thesis-markdown blockquote {
+                        border-left: 4px solid #00ff88;
+                        background: rgba(0,255,136,0.05);
+                        padding: 16px 20px;
+                        margin: 24px 0;
+                        font-style: italic;
+                        color: #94a3b8;
+                        border-radius: 0 8px 8px 0;
+                    }
+                    .thesis-markdown code {
+                        background: #1e293b;
+                        padding: 3px 6px;
+                        border-radius: 4px;
+                        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+                        font-size: 0.85em;
+                        color: #fb7185;
+                    }
+                    .thesis-markdown pre {
+                        background: #0f172a;
+                        padding: 20px;
+                        border-radius: 8px;
+                        overflow-x: auto;
+                        border: 1px solid #1e293b;
+                        margin-bottom: 24px;
+                    }
+                    .thesis-markdown pre code {
+                        background: transparent;
+                        padding: 0;
+                        color: #e2e8f0;
+                    }
+                    .thesis-markdown table {
+                        width: 100%;
+                        border-collapse: collapse;
+                        margin-bottom: 24px;
+                        font-size: 14px;
+                    }
+                    .thesis-markdown th, .thesis-markdown td {
+                        border: 1px solid #1e293b;
+                        padding: 12px 16px;
+                        text-align: left;
+                    }
+                    .thesis-markdown th {
+                        background: #1e293b;
+                        color: #00ff88;
+                        font-weight: 600;
+                    }
+                    .thesis-markdown tr:nth-child(even) {
+                        background: rgba(255,255,255,0.02);
+                    }
+                    .thesis-markdown img {
+                        max-width: 100%;
+                        height: auto;
+                        border-radius: 8px;
+                        display: inline-block;
+                        margin: 0 4px;
+                    }
+                    .thesis-markdown hr {
+                        border: 0;
+                        border-top: 1px solid #1e293b;
+                        margin: 40px 0;
+                    }
+                `}</style>
+                <ReactMarkdown
+                    remarkPlugins={[remarkGfm]}
+                    rehypePlugins={[rehypeRaw]}
+                    components={{
+                        code({ node, inline, className, children, ...props }: any) {
+                            const match = /language-(\w+)/.exec(className || '');
+                            if (!inline && match && match[1] === 'mermaid') {
+                                const rawText = String(children).trim();
+                                return <Mermaid text={rawText} />;
+                            }
+                            return (
+                                <code className={className} {...props}>
+                                    {children}
+                                </code>
+                            );
+                        }
+                    }}
+                >
+                    {readmeText}
+                </ReactMarkdown>
             </div>
         </div>
     );
-};
-
-const headingStyle: React.CSSProperties = {
-    fontSize: '16px',
-    fontWeight: 700,
-    color: '#fff',
-    display: 'flex',
-    alignItems: 'center',
-    marginBottom: '20px',
-    textTransform: 'uppercase',
-    letterSpacing: '1.5px',
-};
-
-const paraStyle: React.CSSProperties = {
-    fontSize: '15px',
-    lineHeight: 1.75,
-    color: '#94a3b8',
-    marginBottom: '14px',
-};
-
-const hrStyle: React.CSSProperties = {
-    border: 'none',
-    borderTop: '1px solid #1e293b',
-    margin: '40px 0',
-};
-
-const codeBoxStyle: React.CSSProperties = {
-    background: 'rgba(0,255,136,0.05)',
-    border: '1px solid rgba(0,255,136,0.2)',
-    padding: '16px',
-    borderRadius: '8px',
-    color: '#00ff88',
-    fontFamily: 'monospace',
-    fontSize: '13px',
-    margin: '16px 0',
-};
-
-const cardStyle: React.CSSProperties = {
-    background: '#0f172a',
-    border: '1px solid #1e293b',
-    borderRadius: '10px',
-    padding: '16px',
-};
-
-const thStyle: React.CSSProperties = {
-    textAlign: 'left',
-    padding: '10px 16px',
-    color: '#475569',
-    fontWeight: 600,
-    fontSize: '11px',
-    textTransform: 'uppercase',
-    letterSpacing: '1px',
-};
-
-const tdStyle: React.CSSProperties = {
-    padding: '10px 16px',
-    color: '#94a3b8',
 };

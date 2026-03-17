@@ -19,17 +19,22 @@
     "leaflet": "^1.9.4",
     "lucide-react": "^0.563.0",
     "mapbox-gl": "^3.20.0",
+    "mermaid": "^11.13.0",
     "osmtogeojson": "^3.0.0-beta.5",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "react-leaflet": "^5.0.0",
     "react-map-gl": "^8.1.0",
+    "react-markdown": "^10.1.0",
     "recharts": "^3.7.0",
+    "rehype-raw": "^7.0.0",
+    "remark-gfm": "^4.0.1",
     "three": "^0.182.0"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",
     "@vitejs/plugin-react": "^5.0.0",
+    "dotenv": "^17.3.1",
     "typescript": "~5.8.2",
     "vite": "^6.2.0"
   }

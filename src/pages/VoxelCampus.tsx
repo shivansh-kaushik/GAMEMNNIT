@@ -129,16 +129,82 @@ export const VoxelCampus: React.FC<VoxelCampusProps> = ({ selectedBuildingId, on
         } catch (e) {
             console.warn('Buildings collection error fallback used');
 
-            const TWEAKS = {
-                academic: { pos: [85, 0.5, 5], rot: [0, -0.25, 0], size: [210, 12, 170] },
-                admin: { pos: [60, 0.5, 40], rot: [0, -1.8, 0], size: [80, 16, 50] }
-            };
+            const syncStorage = localStorage.getItem('campusBuildings');
+            if (syncStorage) {
+                try {
+                    const parsed = JSON.parse(syncStorage);
+                    if (Array.isArray(parsed) && parsed.length > 0) {
+                        const syncedLayout = parsed.map((b: any) => {
+                            let type = 'facility';
+                            if (b.id === 'academic') type = 'academic';
+                            else if (b.id.includes('admin') || b.id.includes('dean')) type = 'admin';
+                            else if (b.id === 'mech' || b.id === 'csed' || b.id === 'sms') type = 'department';
+                            
+                            return {
+                                id: b.id,
+                                name: b.name,
+                                type,
+                                position: b.pos,
+                                size: b.size,
+                                rotation: b.rot,
+                                color: b.color
+                            };
+                        });
+                        setBuildings(syncedLayout);
+                        return; // exit early if loaded from cache
+                    }
+                } catch (err) {
+                    console.warn("Failed to parse synced layout", err);
+                }
+            }
 
-            setBuildings([
-                { id: 'academic', name: "ACADEMIC BUILDING", type: 'academic', position: TWEAKS.academic.pos as [number, number, number], size: TWEAKS.academic.size as [number, number, number], rotation: TWEAKS.academic.rot as [number, number, number], color: "#fef3c7" },
-                { id: 'admin', name: "ADMIN BUILDING", type: 'admin', position: TWEAKS.admin.pos as [number, number, number], size: TWEAKS.admin.size as [number, number, number], rotation: TWEAKS.admin.rot as [number, number, number], color: "#d9b38c" },
-            ]);
+            // Fallback default
+            const customLayout = [
+                { id: "academic", name: "ACADEMIC BUILDING", type: "academic", position: [154.23, 0.5, -55], size: [210, 12, 170], rotation: [0, 0, 0], color: "#d2b48c" },
+                { id: "admin", name: "ADMIN BUILDING", type: "admin", position: [335.0, 0.5, -57.69], size: [80, 16, 50], rotation: [0, -1.57, 0], color: "#fca5a5" },
+                { id: "sports", name: "Sports Field", type: "facility", position: [162.69, 0.1, 102.31], size: [120, 0.2, 70], rotation: [0, 0, 0], color: "#4ade80" },
+                { id: "mech", name: "Mechanical Building", type: "department", position: [-20.77, 0.5, -3.85], size: [70, 14, 80], rotation: [0, -1.57, 0], color: "#cda080" },
+                { id: "multi_purpose", name: "Multi Purpose", type: "facility", position: [-159.23, 0.5, -247.69], size: [100, 14, 70], rotation: [0, 0.02, 0], color: "#d2b48c" },
+                { id: "diamond_jubilee", name: "DIAMOND JUBILEE UNDERPASS", type: "facility", position: [-123.85, 0.5, -165.38], size: [90, 8, 40], rotation: [0, 0, 0], color: "#6b7280" },
+                { id: "underpass_tunnel", name: "UNDERPASS TUNNEL ROAD", type: "facility", position: [-143.08, 0.5, 80.77], size: [120, 8, 50], rotation: [0, 0, 0], color: "#6b7280" },
+                { id: "dean_acad", name: "DEAN ACADMICS", type: "admin", position: [221.54, 0.5, -184.62], size: [60, 10, 40], rotation: [0, 0, 0], color: "#e2c49c" },
+                { id: "cafe98", name: "CAFE 98", type: "facility", position: [214.62, 0.5, -236.15], size: [50, 8, 30], rotation: [0, 0, 0], color: "#e2c49c" },
+                { id: "csed", name: "CSED", type: "department", position: [116.15, 0.5, -286.92], size: [70, 14, 60], rotation: [0, 0, 0], color: "#d2b48c" },
+                { id: "sms", name: "SMS", type: "department", position: [-132.31, 0.5, -366.92], size: [80, 14, 40], rotation: [0, 0, 0], color: "#d2b48c" },
+                { id: "girls_hostel", name: "GIRLS HOSTEL", type: "facility", position: [113.85, 0.5, -367.69], size: [60, 16, 40], rotation: [0, 0, 0], color: "#cda080" },
+                { id: "boys_hostel", name: "BOYS HOSTEL", type: "facility", position: [223.85, 0.5, -375.38], size: [60, 16, 40], rotation: [0, -0.02, 0], color: "#cda080" },
+                { id: "nadcab", name: "NADCAB", type: "facility", position: [333.08, 0.5, -210.77], size: [60, 12, 50], rotation: [0, 0, 0], color: "#d2b48c" }
+            ];
+
+            setBuildings(customLayout as any);
         }
+    }, []);
+
+    // Listen for real-time Layout Tool (campuslayout.html iframe) position updates
+    useEffect(() => {
+        const handleMessage = (event: MessageEvent) => {
+            if (event.data?.type === 'VOXEL_LAYOUT_UPDATE' && Array.isArray(event.data.payload)) {
+                const updatedBuildings = event.data.payload.map((b: any) => {
+                    let type = 'facility';
+                    if (b.id === 'academic') type = 'academic';
+                    else if (b.id.includes('admin') || b.id.includes('dean')) type = 'admin';
+                    else if (b.id === 'mech' || b.id === 'csed' || b.id === 'sms') type = 'department';
+                    
+                    return {
+                        id: b.id,
+                        name: b.name,
+                        type,
+                        position: b.pos,
+                        size: b.size,
+                        rotation: b.rot,
+                        color: b.color
+                    };
+                });
+                setBuildings(updatedBuildings);
+            }
+        };
+        window.addEventListener('message', handleMessage);
+        return () => window.removeEventListener('message', handleMessage);
     }, []);
 
     const fetchRoads = useCallback(async () => {
@@ -157,7 +223,46 @@ export const VoxelCampus: React.FC<VoxelCampusProps> = ({ selectedBuildingId, on
         } catch (e) {
             console.warn('Roads collection error fallback used');
             const mainRoad: [number, number][] = [];
-            for (let x = -20; x < 80; x++) for (let z = -5; z < 5; z++) mainRoad.push([x, z]);
+            // User's custom road network (2-lane width)
+            const LANE_WIDTH = 12;
+
+            // 1. Horizontal Road (Main divide above Academic, extending far left)
+            for (let x = -50; x < 480; x++) {
+                for (let w = 0; w < LANE_WIDTH; w++) mainRoad.push([x, -100 + w]);
+            }
+            // 2. Vertical Road (Left of Academic, between Academic and Mech)
+            for (let z = -100; z < 180; z++) {
+                for (let w = 0; w < LANE_WIDTH; w++) mainRoad.push([180 + w, z]);
+            }
+            // 3. Vertical Road (Left of Dean/CSED block, leading to SMS)
+            for (let z = -320; z < -100; z++) {
+                for (let w = 0; w < LANE_WIDTH; w++) mainRoad.push([150 + w, z]);
+            }
+            // 4. Horizontal branch for SMS
+            for (let x = 150; x < 230; x++) {
+                for (let w = 0; w < LANE_WIDTH; w++) mainRoad.push([x, -270 + w]);
+            }
+            // 5. Vertical Road (Right of Academic, between Admin & Academic) - BIG 3-LANE ROAD
+            const THREE_LANE_WIDTH = 18;
+            for (let z = -120; z < 120; z++) {
+                for (let w = 0; w < THREE_LANE_WIDTH; w++) mainRoad.push([-45 + w, z]);
+            }
+            // 6. Horizontal bottom branch crossing Mechanical Building to underpass
+            for (let x = 180; x < 480; x++) {
+                for (let w = 0; w < LANE_WIDTH; w++) mainRoad.push([x, 50 + w]);
+            }
+            // 7. Far-Left Vertical Road connecting underpasses
+            for (let z = -200; z < 150; z++) {
+                for (let w = 0; w < LANE_WIDTH; w++) mainRoad.push([390 + w, z]);
+            }
+            // 8. Perimeter Top/Right outline
+            for (let z = -350; z < -100; z++) {
+                for (let w = 0; w < LANE_WIDTH; w++) mainRoad.push([-50 + w, z]); // Far Right vertical
+            }
+            for (let x = -50; x < 480; x++) {
+                for (let w = 0; w < LANE_WIDTH; w++) mainRoad.push([x, -350 + w]); // Top horizontal
+            }
+
             setRoads(mainRoad);
         }
     }, []);
@@ -398,7 +503,7 @@ export const VoxelCampus: React.FC<VoxelCampusProps> = ({ selectedBuildingId, on
                 )}
             </div >
 
-            <div style={{ position: 'absolute', top: isMobile ? 'auto' : 'auto', bottom: isMobile ? '70px' : '20px', right: isMobile ? '5px' : '20px', left: 'auto', pointerEvents: 'auto', transform: isMobile ? 'scale(0.5)' : 'none', transformOrigin: isMobile ? 'bottom right' : 'bottom right', zIndex: 3000 }}>
+            <div style={{ position: 'absolute', top: isMobile ? 'auto' : 'auto', bottom: isMobile ? '70px' : '80px', right: isMobile ? '5px' : '20px', left: 'auto', pointerEvents: 'auto', transform: isMobile ? 'scale(0.5)' : 'none', transformOrigin: isMobile ? 'bottom right' : 'bottom right', zIndex: 3000 }}>
                 <Minimap userPos={finalPos || [0, 0, 0]} buildings={buildings} destination={buildings.find(b => b.id === selectedBuildingId)?.name} />
             </div>
 
