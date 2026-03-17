@@ -57,6 +57,21 @@ The resulting prototype, validated on the MNNIT Allahabad campus dataset, demons
 
 ---
 
+## 📸 Screenshots
+
+<p align="center">
+  <img src="docs/screenshot_twin.png" width="30%" alt="3D Digital Twin Campus View" />
+  &nbsp;&nbsp;
+  <img src="docs/screenshot_ar.png" width="30%" alt="AR Navigation with Confidence Cone" />
+  &nbsp;&nbsp;
+  <img src="docs/screenshot_ai.png" width="30%" alt="AI Voice Assistant with Structured JSON Response" />
+</p>
+<p align="center">
+  <em>Left: 3D Digital Twin &nbsp;|&nbsp; Center: AR Navigation with Confidence-Aware Overlay &nbsp;|&nbsp; Right: Gemini AI Voice Assistant</em>
+</p>
+
+---
+
 ## 🧠 System Design Highlights
 
 | Highlight | Why It Matters |
