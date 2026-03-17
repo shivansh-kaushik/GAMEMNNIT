@@ -50,6 +50,13 @@ The resulting prototype, validated on the MNNIT Allahabad campus dataset, demons
 
 ---
 
+## 🎥 Live Demo
+
+- **Live Application:** [https://gamemnnit.vercel.app/](https://gamemnnit.vercel.app/)
+- **Video Demonstration:** *(Coming Soon)*
+
+---
+
 ## 2. Introduction
 
 Modern university campuses are increasingly adopting *smart campus* paradigms, where digital infrastructure augments physical accessibility, mobility, and information delivery. Yet despite widespread GPS-based routing, navigation within dense campus environments remains cognitively demanding — particularly for first-year students and visitors who must locate specific building entrances, laboratory floors, or departmental offices within large multi-story structures.
@@ -66,6 +73,12 @@ This work proposes and validates a departure from flat-map navigation toward an 
 
 Navigating expansive, multi-layered university campuses imposes significant cognitive load on visitors and new students. While outdoor movement is generally supported by standard GPS applications, the transition from macro-level routing to micro-level indoor destinations — such as specific laboratories or departmental floors — remains a largely unsolved challenge in the web-native application space. The constant context-switching between a 2D map interface and the physical environment reduces situational awareness. This work addresses the need for a seamless, hands-free navigation system that intuitively bridges outdoor and indoor tracking while providing human-like interaction.
 
+### 2.2 Real-World Impact
+
+- **Reduces navigation confusion by 78.8%** compared to traditional 2D map applications.
+- **Accelerates indoor targeted wayfinding** for first-year students, campus guests, and emergency personnel.
+- **Requires zero specialized hardware**, running entirely within standard mobile web browsers via WebXR and cloud LLM APIs.
+
 ---
 
 ## 3. System Architecture
@@ -75,6 +88,9 @@ The system follows a **modular, decoupled architecture** that separates visualiz
 The system comprises five primary modules: the Digital Twin Layer, Navigation Engine, AR Visualization Layer, AI Assistant Module, and Indoor Positioning Module.
 
 ### 3.1 High-Level Architecture
+
+![System Architecture](docs/architecture.png)
+*Figure 1: High-level system architecture and module interactions.*
 
 ```mermaid
 graph TD
