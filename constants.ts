@@ -16,19 +16,19 @@ export const MODEL_CONFIG = {
 // Refined Spatial Layout - Rebuilt based on Campus Diagram
 export const CAMPUS_BUILDINGS: Building[] = [
   // Top Row
-  { id: 'seminar', name: 'Seminar Halls', position: [0, 8, -100], size: [30, 16, 25], color: '#94a3b8' },
-  { id: 'admin', name: 'Admin Building', position: [70, 8, -100], size: [60, 16, 25], color: '#f8fafc' },
+  { id: 'seminar', name: 'Seminar Halls', type: 'other', position: [0, 8, -100], size: [30, 16, 25], color: '#94a3b8' },
+  { id: 'admin', name: 'Admin Building', type: 'admin', position: [70, 8, -100], size: [60, 16, 25], color: '#f8fafc' },
 
   // Middle Row
-  { id: 'cc', name: 'Computer Center', position: [-80, 8, 0], size: [35, 16, 30], color: '#60a5fa' },
-  { id: 'dean', name: 'Dean Acadmics', position: [0, 8, 0], size: [35, 16, 30], color: '#93c5fd' },
-  { id: 'academic', name: 'Acadmic Bhulding', position: [90, 8, 10], size: [70, 16, 100], color: '#cbd5e1' },
-  { id: 'sports', name: 'Sports Ground', position: [200, 0.2, 10], size: [100, 0.4, 150], color: '#059669' },
+  { id: 'cc', name: 'Computer Center', type: 'lab', position: [-80, 8, 0], size: [35, 16, 30], color: '#60a5fa' },
+  { id: 'dean', name: 'Dean Academics', type: 'admin', position: [0, 8, 0], size: [35, 16, 30], color: '#93c5fd' },
+  { id: 'academic', name: 'Academic Building', type: 'academic', position: [90, 8, 10], size: [70, 16, 100], color: '#cbd5e1' },
+  { id: 'sports', name: 'Sports Ground', type: 'other', position: [200, 0.2, 10], size: [100, 0.4, 150], color: '#059669' },
 
   // Bottom Area
-  { id: 'csed', name: 'CSED Dept', position: [-80, 8, 100], size: [35, 16, 35], color: '#3b82f6' },
-  { id: 'geotech', name: 'Geo Tech Labs', position: [10, 8, 110], size: [25, 16, 60], color: '#64748b' },
-  { id: 'mp_hall', name: 'MP Hall', position: [70, 8, 200], size: [120, 16, 60], color: '#c084fc' },
+  { id: 'csed', name: 'CSED Dept', type: 'academic', position: [-80, 8, 100], size: [35, 16, 35], color: '#3b82f6' },
+  { id: 'geotech', name: 'Geo Tech Labs', type: 'lab', position: [10, 8, 110], size: [25, 16, 60], color: '#64748b' },
+  { id: 'mp_hall', name: 'MP Hall', type: 'other', position: [70, 8, 200], size: [120, 16, 60], color: '#c084fc' },
 ];
 
 export const ACCESS_POINTS: AccessPoint[] = [

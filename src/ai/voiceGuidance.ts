@@ -67,7 +67,10 @@ export function startVoiceGuidance(
             let text = instructionToText(instruction);
 
             // Try to enrich with LLM
-            const llmResult = await queryLLM(buildGuidancePrompt(instruction));
+            const llmResult = await queryLLM(
+                [{ role: 'user', parts: [{ text: buildGuidancePrompt(instruction) }] }],
+                'You are a navigation assistant. Convert the instruction into a single short spoken sentence.'
+            );
             if (llmResult.ok && llmResult.text.trim().length > 5) {
                 text = llmResult.text.trim();
             }
