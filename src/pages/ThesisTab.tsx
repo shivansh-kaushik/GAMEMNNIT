@@ -1,9 +1,12 @@
 import React, { useEffect, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import remarkMath from 'remark-math';
 import rehypeRaw from 'rehype-raw';
+import rehypeKatex from 'rehype-katex';
 import mermaid from 'mermaid';
 import readmeText from '../../README.md?raw';
+import 'katex/dist/katex.min.css';
 
 const Mermaid = ({ text }: { text: string }) => {
     const [svgContent, setSvgContent] = React.useState<string>('');
@@ -150,8 +153,8 @@ export const ThesisTab: React.FC = () => {
                     }
                 `}</style>
                 <ReactMarkdown
-                    remarkPlugins={[remarkGfm]}
-                    rehypePlugins={[rehypeRaw]}
+                    remarkPlugins={[remarkGfm, remarkMath]}
+                    rehypePlugins={[rehypeRaw, rehypeKatex]}
                     components={{
                         code({ node, inline, className, children, ...props }: any) {
                             const match = /language-(\w+)/.exec(className || '');

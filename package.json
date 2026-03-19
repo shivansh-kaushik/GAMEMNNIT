@@ -16,6 +16,7 @@
     "@types/mapbox-gl": "^3.4.1",
     "appwrite": "^22.4.1",
     "firebase": "^12.9.0",
+    "katex": "^0.16.39",
     "leaflet": "^1.9.4",
     "lucide-react": "^0.563.0",
     "mapbox-gl": "^3.20.0",
@@ -27,8 +28,10 @@
     "react-map-gl": "^8.1.0",
     "react-markdown": "^10.1.0",
     "recharts": "^3.7.0",
+    "rehype-katex": "^7.0.1",
     "rehype-raw": "^7.0.0",
     "remark-gfm": "^4.0.1",
+    "remark-math": "^6.0.0",
     "three": "^0.182.0"
   },
   "devDependencies": {
