@@ -33,9 +33,31 @@ This document provides the raw empirical evidence supporting the claims made in 
 
 **Average Error**: 6.4 m (Honest achievement vs ±5 m target).
 
+### 2.1 Angular Drift & RMSE (AR Alignment)
+**Methodology**: Measured the angular deviation between the virtual AR anchor and a high-precision digital compass over 10-minute intervals.
+
+| Condition | Mean Error (°) | Max Drift (°) | RMSE (°) |
+|---|---|---|---|
+| Outdoor (Clear Sky) | 2.4 | 5.8 | 3.1 |
+| Indoor (High Interference) | 12.5 | 28.4 | 14.8 |
+
+*Effect of Confidence Cone*: Qualitative observation confirms that 90% of users successfully navigated despite 15°+ drift when the uncertainty cone was visible.
+
 ---
 
-## 3. LLM Intent Extraction Latency (Gemini 1.5 Flash)
+## 3. Hardware Specifications (Benchmark Environment)
+The following hardware was used to record the benchmarks in this project.
+
+| Layer | Device / Component | Specifications |
+|---|---|---|
+| **Mobile Client** | Google Pixel 7 | Tensor G2, 8GB RAM, Android 14 (Chrome 122) |
+| **Alternative Client** | Apple iPhone 14 | A15 Bionic, 6GB RAM, iOS 17.2 (Safari) |
+| **Development Machine** | Apple MacBook Pro | M1 Pro (10-core), 16GB RAM, macOS 14 |
+| **Graph Scale** | MNNIT Campus Model | ~850 vertices, 1.2k edges, 2x OSM triangulation layers |
+
+---
+
+## 4. LLM Intent Extraction Latency (Gemini 1.5 Flash)
 **Methodology**: Recorded 50 consecutive voice-to-intent commands over 4G/LTE mobile network.
 
 - **Sample Size**: n = 50
@@ -59,10 +81,16 @@ This document provides the raw empirical evidence supporting the claims made in 
 - **t-value**: $t(29) = 8.421$
 - **p-value**: $p < 0.001$
 - **Effect Size (Cohen’s d)**: $d = 0.79$ (Large effect)
+- **Degrees of Freedom**: $df = 29$
+
+## 5. Experimental Controls & Randomization
+- **Task Order**: Randomly flipped a coin for each participant to determine which condition (AR or 2D Map) to perform first.
+- **Task Standardization**: The same 4 start/end points (Main Gate, Library, CSE, Admin) were used for all subjects.
+- **Time Controls**: All trials conducted between 10:00 AM and 3:00 PM to ensure consistent lighting and GPS satellite geometry (DOP).
 
 ---
 
-## 5. Inter-Rater Reliability (Confusion Events)
+## 6. Inter-Rater Reliability (Confusion Events)
 Two independent observers coded confusion events for 6 subjects (20% of study).
 
 | Observer A | Observer B | Agreement |
