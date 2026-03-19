@@ -98,3 +98,32 @@ Two independent observers coded confusion events for 6 subjects (20% of study).
 | 12 events | 11 events | 91.6% |
 
 **Cohen's Kappa (κ)**: 0.88 (Strong agreement).
+
+---
+
+## 7. Phase 2: $A+$ Research Roadmap (Proposed)
+To bridge the gap between "prototype" and "publishable research," the following $N=40$ protocol and algorithmic extensions are proposed for the final thesis submission.
+
+### 7.1 Expanded User Study ($N=40$)
+- **Participants**: 40 individuals (balanced for age, gender, and prior smartphone navigation experience).
+- **Task Complexity**: 6 standardized routes, including multi-building and indoor-to-outdoor transitions.
+- **Hypothesis**: The proposed uncertainty-aware visualization reduces "Trust Miscalibration" by 25% compared to static navigation arrows.
+
+### 7.2 UA-A* (Uncertainty-Aware A*) Framework
+We introduce the **UA-A*** algorithm, which treats the graph traversal as a cost-minimization problem sensitive to sensor reliability.
+
+```typescript
+function UA_Astar_Cost(n1, n2) {
+    const geometricCost = euclidean_distance(n1, n2);
+    const uncertaintyPenalty = (n1.error_radius + n2.error_radius) / 2;
+    const reliabilityDiscount = (n1.signal_quality * n2.signal_quality);
+    
+    // Paths through high-reliability zones (e.g., clear GPS) are preferred
+    return geometricCost * (1 + uncertaintyPenalty) / reliabilityDiscount;
+}
+```
+
+### 7.3 Ablation Study Design
+- **Group 1 (Control)**: Standard AR Arrow (ignores drift).
+- **Group 2 (Proposed)**: Uncertainty Cone (visualizes sensor variance).
+- **Group 3 (Baseline)**: 2D Map navigation only.
