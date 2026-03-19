@@ -440,20 +440,6 @@ export const VoxelCampus: React.FC<VoxelCampusProps> = ({ selectedBuildingId, on
             < div style={{ position: 'absolute', top: isMobile ? '10px' : '20px', left: isMobile ? '10px' : '20px', color: 'white', fontFamily: 'monospace', pointerEvents: 'none', width: isMobile ? '140px' : '300px', zIndex: 3000, display: 'flex', flexDirection: 'column', gap: isMobile ? '4px' : '10px' }}>
                 <h1 style={{ margin: 0, fontSize: isMobile ? '12px' : '18px', letterSpacing: '2px', textShadow: '0 0 10px #00ff88' }}>🏛 MNNIT TWIN</h1>
 
-                <div style={{ pointerEvents: 'auto', display: 'flex', flexDirection: 'column', gap: '5px', background: 'rgba(0,0,0,0.5)', padding: '10px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)', backdropFilter: 'blur(5px)' }}>
-                    <label style={{ fontSize: '9px', color: '#888', letterSpacing: '1px' }}>POSITIONING MODE</label>
-                    <select
-                        value={positioningMode}
-                        onChange={(e) => setPositioningMode(e.target.value as PositioningMode)}
-                        style={{ width: '100%', background: '#111', border: '1px solid #333', padding: '8px', color: '#00ff88', borderRadius: '6px', fontSize: '11px', outline: 'none', cursor: 'pointer', fontWeight: 'bold', textTransform: 'uppercase' }}
-                    >
-                        <option value="simulator">SIMULATOR (DEFAULT)</option>
-                        <option value="gps">GPS</option>
-                        <option value="wifi">WIFI RSSI</option>
-                        <option value="fusion">SMART FUSION</option>
-                    </select>
-                </div>
-
                 {onTransportModeChange && (
                     <TransportSelector mode={transportMode} onModeChange={onTransportModeChange} />
                 )}

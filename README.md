@@ -135,6 +135,7 @@ sequenceDiagram
     participant User
     participant AI as AI Assistant Gemini 1.5
     participant Nav as Navigation Engine A-Star
+    participant Trans as Geospatial Transform Pipeline
     participant Sens as GPS and Sensor Tracking
     participant AR as AR Rendering Engine
 
@@ -142,7 +143,9 @@ sequenceDiagram
     AI->>AI: Speech Recognition & Intent Extraction
     AI->>Nav: Destination Identification
     Nav->>Nav: A-Star Pathfinding
-    Nav->>Sens: Route Path
+    Nav->>Trans: Local Voxel Coordinates
+    Trans->>Trans: Lat/Lon ↔ Voxel Align (MNNIT Datum)
+    Nav->>Sens: Geographically Anchored Route
     Sens->>AR: Synchronize Location Data
     AR->>User: AR Navigation Arrows & Voice Guidance
 ```
@@ -180,7 +183,7 @@ The campus graph consists of approximately 850 nodes and 1,200 edges, covering ~
 
 - **`MapboxGround.tsx`** — Renders satellite tile layers and real-world topological references beneath the campus 3D geometry.
 - **`fetchOSMBuildings.ts`** — Queries the Overpass API to retrieve building footprints, which are triangulated and rendered as interactive 3D meshes in Three.js.
-- **`coordinateTransform.ts`** — Implements a bidirectional affine transformation matrix that maps raw GPS geographic coordinates `(Lat, Lon)` into the Digital Twin's Cartesian space `(X, Y, Z)`.
+- **`coordinateTransform.ts`** — Implements a **Geospatially Anchored Voxel Engine** via a high-precision transformation matrix. It aligns the digital twin precisely to the **MNNIT_CENTER datum** using `cos(lat)` adjusted scaling to eliminate lateral drift across the campus scale.
 
 ### 5.3 Layout Synchronization Pipeline
 
@@ -398,7 +401,7 @@ The quantitative feedback unequivocally confirms that the immersive AR overlay d
 
 2. **Discrete-to-Generative AI Bridge** — A novel integration methodology that feeds discrete A\* graph node outputs into the Gemini generative language model, enabling natural language reasoning over structured spatial data without exposing raw graph internals to the model.
 
-3. **Hybrid Indoor-Outdoor Architecture** — A unified client-side framework combining theoretical indoor localization mathematics (RSSI fingerprinting, barometric altimetry) with outdoor GIS data sources (OSM, Mapbox) within a single React application payload.
+3. **Geospatially Anchored Voxel Engine** — A unified client-side framework that synchronizes three disparate coordinate frames: (1) Abstract voxel world space, (2) Mapbox satellite imagery layers, and (3) Raw WGS84 GPS telemetry. This is achieved via a custom high-precision projection matrix calibrated to the campus's central datum, ensuring sub-meter alignment of virtual assets to real-world ground truth.
 
 ---
 

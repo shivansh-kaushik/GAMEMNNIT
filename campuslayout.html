@@ -189,6 +189,20 @@
     </div>
 
     <script>
+        // ==================== GIS ANCHOR (must match GISUtils.ts & coordinateTransform.ts) ==
+        // MNNIT_CENTER → voxel [25, 0, 25]. 1 voxel ≈ 1 metre.
+        const GIS_LAT = 25.494677;
+        const GIS_LON = 81.864779;
+        const VOXEL_OX = 25, VOXEL_OZ = 25;
+        const M_PER_DEG_LAT = 111320;
+        const M_PER_DEG_LNG = 111320 * Math.cos(GIS_LAT * Math.PI / 180);
+
+        function voxelToGPS(vx, vz) {
+            const lon = (vx - VOXEL_OX) / M_PER_DEG_LNG + GIS_LON;
+            const lat = GIS_LAT - (vz - VOXEL_OZ) / M_PER_DEG_LAT;
+            return { lat, lon };
+        }
+
         // ==================== EMBEDDED BUILDINGS (SAVED LAYOUT) ====================
         const DEFAULT_BUILDINGS = [
             {
@@ -628,10 +642,12 @@
                     { x: -hw, z: -hd, label: 'Back Left' }
                 ];
 
+                const gps = voxelToGPS(b.pos[0], b.pos[2]);
                 let block = `<div class="coord-box" style="border-color: ${b.color}">
                     <h3 style="color: ${b.color}">${b.name}</h3>
                     <div class="coord-list">
                         <div class="coord-full-width"><strong>Center[X,Z]:</strong> [${b.pos[0].toFixed(1)}, ${b.pos[2].toFixed(1)}] | <strong>Rot Y:</strong> ${b.rot[1].toFixed(3)} rad</div>
+                        <div class="coord-full-width" style="color:#00ff88;font-size:11px;">📍 GPS: ${gps.lat.toFixed(6)}°N, ${gps.lon.toFixed(6)}°E</div>
                         <div class="coord-full-width"><hr style="border-color: #333; margin: 4px 0;" /></div>`;
 
                 cornersRel.forEach(c => {
