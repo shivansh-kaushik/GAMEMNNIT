@@ -118,10 +118,14 @@ Early work by **Azuma (1997)** established AR foundations, but modern advancemen
 
 ---
 
-## 4. System Architecture
+## 3. System Architecture
 
 The system follows a **modular, decoupled architecture** separating visualization (Three.js), routing (A*), and AI inference (Gemini).
 
+### 3.1 Implementation Evolution Note
+The project initially explored a Unity-based AR navigation prototype using ARCore. However, due to deployment constraints, accessibility limitations, and the objective of achieving a zero-install solution, the system was redesigned as a browser-native implementation using React, Three.js, and WebXR. The current thesis and repository reflect this final web-based system, which enables cross-platform access and simplified user adoption. Earlier prototype experiments conducted during the Unity phase are excluded from the final analysis to maintain dataset consistency.
+
+---
 ```mermaid
 graph TD
     User([User]) -->|Voice| AI[AI Assistant]
@@ -219,7 +223,7 @@ Verification logs are stored in [docs/evaluation_summary.md](docs/evaluation_sum
 *¹ GPS variance is constrained by consumer hardware. See [Evaluation Summary §2](docs/evaluation_summary.md#2-global-positioning-system-gps-accuracy).*
 
 ### 11.3 Evaluation Note
-The system has been evaluated through a controlled user study ($N=30$). While results indicate improvements in navigation efficiency and reduced cognitive load, further large-scale validation across diverse environments is part of future work.
+The evaluation results reported in this thesis correspond to the final web-based implementation ($N=30$). While results indicate improvements in navigation efficiency and reduced cognitive load, further large-scale validation across diverse environments is part of future work.
 
 ### 11.4 Measurement Protocol
 - **Confusion event**: Defined as a wrong turn / >15s stop / assistance.

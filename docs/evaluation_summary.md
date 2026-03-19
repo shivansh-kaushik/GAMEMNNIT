@@ -2,7 +2,16 @@
 
 This document provides the raw empirical evidence supporting the claims made in the project README and M.Tech thesis.
 
-## 1. A* Pathfinding Performance (Benchmark)
+# Performance Evaluation Summary & Evidence Log
+
+**Version**: 2.1 (A+ Alignment)
+**Project Status**: WebXR-based Final Implementation
+**Dataset**: MNNIT Campus Graph ($N=30$)
+
+> [!NOTE]
+> All results reported in this document correspond to the final browser-native implementation (React/Three.js/WebXR). Results from earlier iterative prototypes (Unity/ARCore) are excluded to ensure methodological consistency.
+
+## 1. A* Pathfinding
 **Methodology**: Tested 20 unique point-to-point routes across the MNNIT campus graph (~850 nodes) using the Chrome V8 engine (Desktop).
 
 | Run ID | Route Complexity | Distance (m) | Compute Time (ms) |
