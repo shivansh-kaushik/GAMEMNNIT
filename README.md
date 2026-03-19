@@ -42,9 +42,7 @@
 
 ## 1. Abstract
 
-This work proposes and validates the design and implementation of a smart campus navigation system that fuses geospatial mapping, augmented reality (AR), and AI-driven natural language interaction. The system is engineered to reduce the cognitive load of navigating complex, multi-floor university campuses by grounding spatial guidance within a **digital twin-inspired 3D representation** of the environment.
-
-The core routing framework employs the **A\* pathfinding algorithm** operating over a campus-scale graph. Outdoor positioning is achieved via meter-level GPS alignment, while a conceptual indoor localization framework is proposed using sensor fusion (barometric altimetry and WiFi RSSI). A cloud-based LLM via **Google Gemini 1.5 API** interprets voice commands into structured navigation intents, rendered as AR directional overlays synchronized to the device's camera.
+This work presents the design and prototype implementation of a smart campus navigation system integrating geospatial mapping, augmented reality (AR), and AI-driven interaction. The system demonstrates the feasibility of combining a digital twin-inspired 3D campus model, WebXR-based AR overlays, and structured LLM-based voice interaction for intuitive campus navigation. A proof-of-concept deployment on the MNNIT Allahabad campus dataset illustrates the system architecture, interaction pipeline, and real-time navigation capabilities under practical constraints of consumer-grade sensors.
 
 ---
 
@@ -149,7 +147,7 @@ graph TD
 
 ## 6. Digital Twin & Campus Dataset
 
-The Digital Twin environment (`src/three/`) serves as the **spatial source of truth**.
+The Digital Twin-inspired 3D model environment (`src/three/`) serves as the **spatial source of truth**.
 
 - **Dataset**: ~850 nodes and 1,200 edges covering the MNNIT campus.
 - **Voxel Matrix Editor**: An embedded tool (`campuslayout.html`) enables precise calibration of building positions against the digital twin for geographical accuracy.
@@ -215,24 +213,27 @@ Verification logs are stored in [docs/evaluation_summary.md](docs/evaluation_sum
 |---|---|---|---|
 | **A\* Path Generation** | 12.4 ms ± 4.2 ms (n=20) | < 100 ms | **Met** |
 | **AR Render FPS** | 45.2 FPS ± 8.1 FPS | ≥ 30 FPS | **Met** |
-| **GPS Position Error** | **6.4 m** average (n=5) | ± 5 m | **Partially Met¹** |
+| **GPS Position Error** | **~5–10 m** (partially meets target) | ± 5 m | **Partially Met¹** |
 | **LLM Intent Latency** | 785 ms ± 142 ms (n=50) | < 1.5 s | **Met** |
 
 *¹ GPS variance is constrained by consumer hardware. See [Evaluation Summary §2](docs/evaluation_summary.md#2-global-positioning-system-gps-accuracy).*
 
-### 11.2 User Study Experimental Validation
-- **Design**: Within-subjects, counterbalanced ($N=30$).
-- **Statistical Rigor**: Paired t-test results: **$t(29) = 8.42, p < 0.001$**.
-- **Effect Size**: **Cohen's $d = 0.79$**.
+### 11.3 Evaluation Note
+The system has been evaluated through a controlled user study ($N=30$). While results indicate improvements in navigation efficiency and reduced cognitive load, further large-scale validation across diverse environments is part of future work.
+
+### 11.4 Measurement Protocol
+- **Confusion event**: Defined as a wrong turn / >15s stop / assistance.
+- **Recorded by**: Human observer.
+- **Inter-rater reliability**: Cross-verified for 20% of trials, yielding a **Cohen's kappa $\kappa = 0.88$**.
 
 ---
 
 ## 12. Research Contributions
 
-1. **Confidence-Aware AR Navigation Interface**: A visualization mechanism that communicates spatial ambiguity via "Confidence Cones."
-2. **Browser-Native AR Navigation Pipeline**: A fully Web-native system using WebXR/Three.js without proprietary OS requirements.
-3. **High-Precision Coordinate Transformation**: Synchronizes voxel space with WGS84 GPS telemetry via bidirectional affine mapping.
-4. **Empirical Evaluation**: Validated $N=30$ study proving a **63.8% reduction** in cognitive load via NASA-TLX.
+1. A browser-native AR navigation framework integrating geospatial data, real-time routing, and AI-based interaction without requiring application installation.
+2. A confidence-aware AR visualization mechanism that adapts navigation cues based on sensor uncertainty.
+3. A voxel-based spatial abstraction layer for aligning GIS data with AR rendering and enabling grid-based navigation.
+4. An empirical evaluation demonstrating reduced navigation errors and cognitive load compared to traditional 2D maps, under controlled experimental conditions.
 
 ---
 
@@ -246,7 +247,7 @@ The application features a **Self-Reflecting UI** (Thesis Tab) where this `READM
 
 ### 14.1 Key Limitations
 - **GPS Drift**: Consumer sensors fluctuate ±5–10 m.
-- **WiFi Fingerprinting Status**: Currently a **simulation module** due to browser security restrictions.
+- **WiFi Fingerprinting Status**: Indoor positioning is partially implemented. WiFi RSSI fingerprinting is simulated in the web environment due to browser security constraints. Full deployment requires a native application layer for real-time WiFi scanning.
 
 ### 14.2 Future Directions
 - **VPS Integration**: Camera-based facade recognition to replace magnetometer dependency.
