@@ -57,14 +57,25 @@ The core routing framework employs the **A\* pathfinding algorithm** operating o
 ## 📸 Screenshots
 
 <p align="center">
-  <img src="docs/screenshot_twin.png" width="30%" alt="3D Digital Twin Campus View" />
+  <img src="docs/screenshot_twin.png" width="30%" alt="3D Digital Twin" />
   &nbsp;&nbsp;
-  <img src="docs/screenshot_ar.png" width="30%" alt="AR Navigation with Confidence Cone" />
+  <img src="docs/screenshot_voxel_research.png" width="30%" alt="Research Evaluation Panel" />
   &nbsp;&nbsp;
-  <img src="docs/screenshot_ai.png" width="30%" alt="AI Voice Assistant" />
+  <img src="docs/screenshot_realmap_nodes.png" width="30%" alt="Real Map Node Graph" />
 </p>
 <p align="center">
-  <em>Left: 3D Digital Twin &nbsp;|&nbsp; Center: AR Navigation with Confidence-Aware Overlay &nbsp;|&nbsp; Right: Gemini AI Voice Assistant</em>
+  <em>Digital Twin Overview &nbsp;|&nbsp; Real-time Research Metrics &nbsp;|&nbsp; Campus Node Distribution</em>
+</p>
+
+<p align="center">
+  <img src="docs/screenshot_indoor_pos.png" width="30%" alt="Indoor Positioning Dashboard" />
+  &nbsp;&nbsp;
+  <img src="docs/screenshot_ar_mode.png" width="30%" alt="AR Navigation Mode" />
+  &nbsp;&nbsp;
+  <img src="docs/screenshot_layout_tool.png" width="30%" alt="Layout Calibration Tool" />
+</p>
+<p align="center">
+  <em>Hybrid Indoor Localization (WiFi RSSI) &nbsp;|&nbsp; AR Guidance Interface &nbsp;|&nbsp; Voxel Calibration Grid</em>
 </p>
 
 ---
