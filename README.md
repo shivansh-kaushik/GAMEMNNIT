@@ -10,7 +10,7 @@
   <img src="https://img.shields.io/badge/React-18-blue?logo=react" />
   <img src="https://img.shields.io/badge/Three.js-r128-black?logo=three.js" />
   <img src="https://img.shields.io/badge/AR-WebXR-purple" />
-  <img src="https://img.shields.io/badge/AI-Gemini%201.5-orange" />
+  <img src="https://img.shields.io/badge/AI-OpenAI%20GPT--4o--mini-brightgreen?logo=openai" />
   <img src="https://img.shields.io/badge/Maps-Mapbox%20GL%20JS-green?logo=mapbox" />
   <img src="https://img.shields.io/badge/License-MIT-lightgrey" />
 </p>
@@ -113,7 +113,8 @@ Early work by **Azuma (1997)** established AR foundations, but modern advancemen
 |---|---|---|---|
 | **Uncertainty Visualization** | ✅ (Confidence Cone) | ❌ | ❌ |
 | **Browser-Native (No App)** | ✅ (WebXR/Three.js) | ❌ (Native App) | ❌ (Native App) |
-| **LLM Intent Engine** | ✅ (Gemini 1.5) | ➖ (Google Assistant) | ➖ (Siri) |
+| **LLM Intent Engine** | ✅ (OpenAI GPT-4o-mini) | ➖ (Google Assistant) | ➖ (Siri) |
+| **Ground Truth Reset** | ✅ (QR Anchors / Native Barcode API) | ❌ | ❌ |
 | **Digital Twin Integration** | ✅ (OSM Voxelized) | ➖ (StreetView) | ➖ (Look Around) |
 
 ---
@@ -128,11 +129,14 @@ The project initially explored a Unity-based AR navigation prototype using ARCor
 ---
 ```mermaid
 graph TD
-    User([User]) -->|Voice| AI[AI Assistant]
-    AI -->|Structured JSON| Nav["Navigation Engine A*"]
-    Nav -->|Route Path| AR[AR Rendering Engine]
-    Sensors[Hardware Sensors] --> AR
-    AR -->|Visual Overlay| User
+    User([User]) -->|Voice/Text| AI[AI Assistant GPT-4o-mini]
+    AI -->|Structured JSON Intent| Nav["Navigation Engine A*"]
+    Sensors[Hardware Sensors] --> Snap[Map Matching / Path Snapping]
+    QR[Physical QR Anchors] --> Scan[QR Scan Mode / Absolute Reset]
+    Scan -->|Correction Offset| Snap
+    Snap -->|Snapped Trajectory| AR[Three.js AR Overlay]
+    Nav -->|Route Graph| Snap
+    AR -->|Visual Guidance| User
 ```
 
 ---
@@ -144,7 +148,7 @@ graph TD
 | **Frontend Framework** | React 18, TypeScript, Vite |
 | **3D & Mapping** | Three.js, R3F, Mapbox GL JS, OpenStreetMap API |
 | **AR & Sensors** | WebXR Device API, Geolocation, DeviceOrientation, Barometer |
-| **AI & NLP** | Google Gemini 1.5 API, Web Speech API |
+| **AI & NLP** | OpenAI GPT-4o-mini API, Web Speech API |
 | **Backend & Auth** | Appwrite (BaaS) |
 
 ---
@@ -175,12 +179,13 @@ $$h(n) = \sqrt{(x_n - x_{goal})^2 + (z_n - z_{goal})^2}$$
 
 ---
 
-## 8. AR Navigation System (Dual-Stage Localization)
+Projects directional overlays onto the live camera feed using **WebXR**. To overcome the severe limitations of consumer-grade mobile sensors (GPS drift, magnetometer interference), the system implements a **Dual-Stage Localization System** (DSLS).
 
-Projects directional overlays onto the live camera feed using **WebXR**. To overcome the severe limitations of consumer-grade mobile sensors (GPS drift, magnetometer interference), the system implements a robust **Constraint-Based Route-Matching Engine**.
+> [!NOTE]
+> For a deep dive into the mathematical models, see the full [Research Paper Draft](docs/RESEARCH_PAPER.md).
 
-### 8.1 Dual-Stage Localization Pipeline
-Rather than implicitly trusting raw hardware sensors, the navigation pipeline enforces geographical correctness through two distinct constraint layers:
+### 8.1 Dual-Stage Localization Pipeline (DSLS)
+Rather than implicitly trusting raw hardware sensors, the navigation pipeline enforces geographical correctness through two distinct recalibration layers:
 
 1. **Level 1.5 Map Matching (Temporal & Directional Scoring):** 
    Raw GPS coordinates are mathematically projected onto the defined A* route edges. An Edge Confidence Scoring function (evaluating distance, heading alignment, and path continuity) resolves ambiguous intersections. A Kalman-lite temporal filter applies Linear Interpolation to smooth coordinate corrections and prevent visual jumping.
@@ -207,14 +212,14 @@ To bridge the "Explainability Gap" and demonstrate real-time algorithm execution
 
 ---
 
-## 9. LLM-Assisted Query Interface
+## 9. AI Navigation Assistant (Spatial Intelligence)
 
-Resolves natural language queries into structured JSON routing commands via **Gemini 1.5 Flash**. This acts structurally as an interface layer rather than a core pathfinding reasoning engine.
+The system utilizes **OpenAI GPT-4o-mini** to resolve natural language queries into structured navigation intents.
 
-### 9.1 Structured Intent Pipeline
-1. **User**: "Take me to the CSE building."
-2. **Gemini**: `{ "intent": "NAVIGATE", "target": "cse_block" }`.
-3. **Graph Engine**: Computes path and triggers voice guidance.
+### 9.1 Adaptive Context Pipeline
+1. **Context Construction**: Current GPS coordinates, nearest landmarks, and target destination are injected into a system prompt.
+2. **Intent Parsing**: LLM identifies the destination ID (e.g., `cse_building`) and generates an appropriate natural language reply.
+3. **Voice Guidance Loop**: A secondary feedback loop (`voiceGuidance.ts`) provides proactive audio cues ("Turn left in 10 meters") based on real-time proximity to waypoints.
 
 ---
 
@@ -260,10 +265,10 @@ The evaluation results reported in this thesis correspond to the final web-based
 ## 12. Research Contributions
 
 1. **Uncertainty-Aware AR Visualization (Core Novelty):** The formalization and implementation of the "Confidence Cone" model, proactively communicating sensor ambiguity (GPS drift / Magnetometer noise) to the user visually, mitigating over-reliance on inaccurate mobile hardware.
-2. **Multi-Modal Navigation Engine:** A unified architecture combining raw geospatial topologies (850 nodes, 1200 edges) with optimal A* path planning and an LLM-assisted query interface.
-3. **Web-Native Spatial Alignment:** A continuous spatial framework that accurately maps static 3D voxel coordinate matrices against live Lat/Lng WGS84 telemetry entirely within browser constraints (WebXR).
-4. **Algorithmic Interpretability Interface:** The real-time projection of underlying A* expansion bounds, graph complexity scaling, and execution overheads, ensuring system behaviors remain transparent for thesis/academic evaluation. 
-5. **Empirical Evaluation:** Validating the efficacy of these integrated approaches via measurable reductions in cognitive load (NASA-TLX) and a significant reduction in the context-switching penalty present in standalone 2D maps.
+2. **Dual-Stage Localization System (DSLS):** A novel hybrid localization pipeline combining probabilistic Map Matching (Level 1.5) with absolute Ground Truth recalibration via QR anchors (Level 2), achieving sub-meter perceived navigation accuracy in campus environments.
+3. **Multi-Modal Navigation Engine:** A unified architecture combining raw geospatial topologies (850 nodes, 1200 edges) with optimal A* path planning and an LLM-assisted query interface.
+4. **Web-Native Spatial Alignment:** A continuous spatial framework that accurately maps static 3D voxel coordinate matrices against live Lat/Lng WGS84 telemetry entirely within browser constraints (WebXR).
+5. **Algorithmic Interpretability Interface:** The real-time projection of underlying A* expansion bounds, graph complexity scaling, and execution overheads, ensuring system behaviors remain transparent for thesis/academic evaluation. 
 
 ---
 
@@ -291,7 +296,7 @@ The application features a **Self-Reflecting UI** (Thesis Tab) where this `READM
 
 1. `git clone https://github.com/your-username/smart-campus-nav.git`
 2. `npm install`
-3. Configure `.env` with `VITE_MAPBOX_TOKEN` and `VITE_GEMINI_API_KEY`.
+3. Configure `.env` with `VITE_MAPBOX_TOKEN` and `VITE_OPENAI_API_KEY`.
 4. `npm run dev`
 
 ### 15.2 Reproducibility Package (Benchmarks)
