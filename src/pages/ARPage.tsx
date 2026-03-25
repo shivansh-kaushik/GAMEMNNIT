@@ -18,7 +18,8 @@ import pathData from '../data/mnnit_paths.json';
 import { findNearestGraphNode } from '../navigation/nodeMatcher';
 import { latLngToVoxel } from '../core/GISUtils';
 import { advancedSnapToPath, SnappedLocation } from '../navigation/pathSnapping';
-import { MarkerScanner, MarkerPayload } from '../ar/MarkerLocalization';
+import { MarkerPayload } from '../ar/MarkerLocalization';
+import { QRScanOverlay } from '../components/QRScanOverlay';
 
 const ENTRANCES = [
     { name: "CSE Entrance", lat: 25.4931, lon: 81.8655 },
@@ -92,7 +93,7 @@ export const ARPage: React.FC = () => {
     const [snapUI, setSnapUI] = useState<{isLocked: boolean, confidence: number}>({ isLocked: false, confidence: 0 });
 
     // Level 2: Ground Truth Tracking
-    const markerScannerRef = useRef<MarkerScanner>(new MarkerScanner());
+    const [scanMode, setScanMode] = useState(false);
     const [gtAnchorUI, setGtAnchorUI] = useState<{active: boolean, id: string}>({ active: false, id: '' });
     const gtOffsetRef = useRef({ lat: 0, lon: 0 });
 
@@ -234,35 +235,26 @@ export const ARPage: React.FC = () => {
     const handleMarkerDetected = useCallback((payload: MarkerPayload) => {
         if (!sensors || !sensors.gpsLat || !sensors.gpsLon) return;
 
-        console.log("📍 MARKER DETECTED! Hard Resetting Ground Truth:", payload);
+        console.log('📍 MARKER DETECTED! Hard Resetting Ground Truth:', payload);
 
-        // Calculate discrepancy between Raw GPS and Ground Truth
         const drLat = payload.lat - (sensors.gpsLat - gtOffsetRef.current.lat);
         const drLon = payload.lon - (sensors.gpsLon - gtOffsetRef.current.lon);
-        
         gtOffsetRef.current = { lat: drLat, lon: drLon };
 
-        // Hard reset the compass bearing if requested by the marker
         const newHeadingOffset = payload.bearing - (sensors.compassBearing ?? 0);
         setHeadingOffset(newHeadingOffset);
 
-        // Clear path snapping temporal buffers
         prevSnapRef.current = null;
         setGtAnchorUI({ active: true, id: payload.id });
+        setScanMode(false); // Close the scan overlay, return to AR
 
-        // Trigger Audio Warning
-        const msg = new SpeechSynthesisUtterance("Ground truth established.");
+        const msg = new SpeechSynthesisUtterance('Ground truth established.');
         window.speechSynthesis.speak(msg);
-
     }, [sensors]);
 
-    useEffect(() => {
-        if (arActive && videoRef.current) {
-            markerScannerRef.current.start(videoRef.current, handleMarkerDetected);
-        } else {
-            markerScannerRef.current.stop();
-        }
-    }, [arActive, handleMarkerDetected]);
+    // Note: Passive background scanning (markerScannerRef) is intentionally REMOVED.
+    // WebXR camera lock makes passive scanning unreliable on most devices.
+    // The dedicated Scan Mode (QRScanOverlay) guarantees full camera access.
 
     // ---------- Build waypoints when destination changes ----------
     useEffect(() => {
@@ -412,6 +404,13 @@ export const ARPage: React.FC = () => {
     // ---------- UI ----------
     return (
         <div style={{ width: '100vw', height: '100vh', background: '#000', position: 'relative', overflow: 'hidden' }}>
+            {/* Dedicated QR Scan Mode — fullscreen, independent camera, guaranteed detection */}
+            {scanMode && (
+                <QRScanOverlay
+                    onDetected={handleMarkerDetected}
+                    onCancel={() => setScanMode(false)}
+                />
+            )}
             {/* Camera feed */}
             <video
                 ref={videoRef}
@@ -595,6 +594,23 @@ export const ARPage: React.FC = () => {
                         </div>
                     )}
                 </div>
+            )}
+
+            {/* QR Scan Trigger Button */}
+            {arActive && destId && (
+                <button
+                    onClick={() => setScanMode(true)}
+                    style={{
+                        position: 'absolute', bottom: '20px', right: '16px', zIndex: 15,
+                        background: 'rgba(139, 92, 246, 0.85)',
+                        color: '#fff', border: '1px solid rgba(255,255,255,0.5)',
+                        padding: '10px 16px', borderRadius: '20px',
+                        fontSize: '13px', fontWeight: 'bold', cursor: 'pointer',
+                        backdropFilter: 'blur(6px)'
+                    }}
+                >
+                    📷 Scan QR Anchor
+                </button>
             )}
 
             {/* Diagnostic Panel for Defense / Viva */}
