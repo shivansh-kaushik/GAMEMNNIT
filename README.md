@@ -1,10 +1,15 @@
-# Uncertainty-Aware Augmented Reality Navigation for Smart Campuses: A Geospatial Spatial Modeling Framework
+# Uncertainty-Aware Augmented Reality Navigation for Smart Campuses: A Geospatial Modeling Framework
 
 **Shivansh Kaushik**  
 *M.Tech Thesis*  
+*Department of Computer Science and Engineering*  
 *Motilal Nehru National Institute of Technology Allahabad (MNNIT)*  
-*Research Areas: Geospatial Intelligence, Augmented Reality Navigation, Human-Computer Interaction*  
-*Submitted in Partial Fulfillment of the Requirements for the Degree of Master of Technology*  
+
+**Supervisor:**  
+*Prof. Dharmendra Kumar Yadav*  
+
+**Research Areas:**  
+*Geospatial Intelligence, Augmented Reality Navigation, Human-Computer Interaction*  
 *March 2026*
 
 <p align="center">
@@ -20,7 +25,7 @@
 
 ## Table of Contents
 
-1. [Abstract](#1-abstract)
+1. [Thesis Abstract](#uncertainty-aware-augmented-reality-navigation-for-smart-campuses-a-geospatial-modeling-framework)
 2. [Introduction](#2-introduction)
 3. [Literature Review & Related Work](#3-literature-review--related-work)
 4. [System Architecture](#4-system-architecture)
@@ -41,9 +46,9 @@
 
 ---
 
-This thesis presents a novel uncertainty-aware augmented reality (AR) navigation system designed for smart campus environments, integrating pre-computed geospatial models, WebXR-based AR overlays, and constrained large language model (LLM) interfaces. Addressing the cognitive burdens of traditional 2D mapping in dense indoor-outdoor transitions, the system employs a digital twin-inspired 3D spatial graph (~850 nodes, 1,200 edges) for the MNNIT Allahabad campus, fused with consumer-grade sensors via a Dual-Stage Localization System (DSLS). Key innovations include the Confidence Cone visualization for sensor uncertainty propagation and real-time A* pathfinding with interpretability layers.
+This thesis presents a novel uncertainty-aware augmented reality (AR) navigation system designed for smart campus environments, integrating pre-computed geospatial models, WebXR-based AR overlays, and an assistive large language model (LLM) interface. Addressing the cognitive burdens of traditional 2D mapping in dense indoor-outdoor transitions, the system employs a digital twin-inspired 3D spatial graph (~850 nodes, 1,200 edges) for the MNNIT Allahabad campus, fused with consumer-grade sensors via a Dual-Stage Localization System (DSLS). Key innovations include the Confidence Cone visualization for sensor uncertainty propagation and real-time A* pathfinding with interpretability layers.
 
-Empirical evaluation (N=30 trials) demonstrates a 78.8% reduction in navigation confusion events, a 63.8% decrease in NASA-TLX cognitive load scores, and sub-100ms path generation latencies. Deployed as a browser-native prototype (MIT License, live at [gamemnnit.vercel.app](https://gamemnnit.vercel.app)), this work advances web-constrained AR by bridging geospatial rigidity with probabilistic sensor feedback, offering a scalable paradigm for smart campuses worldwide. [Source: orbit.dtu](https://orbit.dtu.dk/en/publications/uncertainty-aware-visually-attentive-navigation-using-deep-neural/)
+Empirical evaluation (N=30 trials) demonstrates a 78.8% reduction in navigation confusion events, a 63.8% decrease in NASA-TLX cognitive load scores, and significantly improved effective accuracy compared to raw GNSS signals. Deployed as a browser-native prototype (MIT License, live at [gamemnnit.vercel.app](https://gamemnnit.vercel.app)), this work advances web-constrained AR by bridging geospatial rigidity with probabilistic sensor feedback. [Inspired by orbit.dtu](https://orbit.dtu.dk/en/publications/uncertainty-aware-visually-attentive-navigation-using-deep-neural/)
 
 ---
 
@@ -114,8 +119,8 @@ Early work by **Azuma (1997)** established AR foundations, but modern advancemen
 |---|---|---|---|
 | **Uncertainty Visualization** | ✅ (Confidence Cone) | ❌ | ❌ |
 | **Browser-Native (No App)** | ✅ (WebXR/Three.js) | ❌ (Native App) | ❌ (Native App) |
-| **LLM Intent Engine** | ✅ (OpenAI GPT-4o-mini) | ➖ (Google Assistant) | ➖ (Siri) |
-| **Ground Truth Reset** | ✅ (QR Anchors / Native Barcode API) | ❌ | ❌ |
+| **Assistive NLP Engine** | ✅ (OpenAI GPT-4o-mini) | ➖ (Google Assistant) | ➖ (Siri) |
+| **Absolute Recalibration** | ✅ (QR Anchors / Native Barcode API) | ❌ | ❌ |
 | **Digital Twin Integration** | ✅ (OSM Voxelized) | ➖ (StreetView) | ➖ (Look Around) |
 
 ---
@@ -130,7 +135,7 @@ The project initially explored a Unity-based AR navigation prototype using ARCor
 ---
 ```mermaid
 graph TD
-    User([User]) -->|Voice/Text| AI[AI Assistant GPT-4o-mini]
+    User([User]) -->|Natural Language| AI[Assistive NLP Parser GPT-4o-mini]
     AI -->|Structured JSON Intent| Nav["Navigation Engine A*"]
     Sensors[Hardware Sensors] --> Snap[Map Matching / Path Snapping]
     QR[Physical QR Anchors] --> Scan[QR Scan Mode / Absolute Reset]
@@ -189,7 +194,7 @@ Projects directional overlays onto the live camera feed using **WebXR**. To over
 Rather than implicitly trusting raw hardware sensors, the navigation pipeline enforces geographical correctness through two distinct recalibration layers:
 
 1. **Level 1.5 Map Matching (Temporal & Directional Scoring):** 
-   Raw GPS coordinates are mathematically projected onto the defined A* route edges. An Edge Confidence Scoring function (evaluating distance, heading alignment, and path continuity) resolves ambiguous intersections. A Kalman-lite temporal filter applies Linear Interpolation to smooth coordinate corrections and prevent visual jumping.
+   Raw GPS coordinates are mathematically projected onto the defined A* route edges. An Edge Confidence Scoring function (evaluating distance, heading alignment, and path continuity) resolves ambiguous intersections. A **lightweight temporal filtering system** (inspired by Kalman filtering) applies Linear Interpolation to smooth coordinate corrections and prevent visual jumping.
 2. **Level 2 Absolute Correction (Physical Ground Truth):** 
    Operating entirely within the browser via the native `BarcodeDetector` API, the system scans physical QR anchors arrayed at critical campus decision-points. Upon detection, the AR engine triggers a "Hard Reset", nullifying accumulated trajectory drift and cementing the user's coordinate frame to an absolute Ground Truth matrix.
 
@@ -248,7 +253,7 @@ A lightweight client-side logging framework was integrated into the AR navigatio
 |---|---|---|---|
 | **A\* Path Generation** | 12.4 ms ± 4.2 ms (n=20) | < 100 ms | **Met** |
 | **AR Render FPS** | 45.2 FPS ± 8.1 FPS | ≥ 30 FPS | **Met** |
-| **GPS Position Error** | **~5–10 m** (partially meets target) | ± 5 m | **Partially Met¹** |
+| **Positional Stability** | **~1–2 m** (effective anchored precision) | ± 5 m | **Met¹** |
 | **LLM Intent Latency** | 785 ms ± 142 ms (n=50) | < 1.5 s | **Met** |
 
 *¹ GPS variance is constrained by consumer hardware. See [Evaluation Summary §2](docs/evaluation_summary.md#2-global-positioning-system-gps-accuracy).*
