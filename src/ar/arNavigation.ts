@@ -10,6 +10,8 @@ export interface ARNavWaypoint extends ARWorldPoint {
     distFromPrev: number;
     totalDist: number;
     label?: string;
+    gpsLat: number;
+    gpsLon: number;
 }
 
 /**
@@ -47,7 +49,9 @@ export function buildARPath(
             ...wp,
             distFromPrev: dist,
             totalDist: totalDist - accumulated,
-            label: i === steps ? dest.name : undefined
+            label: i === steps ? dest.name : undefined,
+            gpsLat: lat,
+            gpsLon: lon
         });
     }
 

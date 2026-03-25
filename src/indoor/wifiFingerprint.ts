@@ -2,7 +2,7 @@
  * wifiFingerprint.ts
  * Stores pre-collected RSSI fingerprints per floor and computes the
  * Euclidean distance between a live scan and each stored fingerprint.
- * Also handles native mobile RSSI data injection (Flutter/Android WebView).
+ * Also handles native mobile RSSI data injection (Android WebView).
  */
 
 export interface APReading {
@@ -81,7 +81,7 @@ export function matchFloorByFingerprint(liveScan: APReading[]): number | null {
 
 /**
  * Mobile wrapper bridge — native apps inject RSSI data via this global function.
- * Flutter/Android code: window.__injectRSSI([{ssid, rssi}, ...])
+ * Android code: window.__injectRSSI([{ssid, rssi}, ...])
  */
 let _latestNativeScan: APReading[] = [];
 (window as any).__injectRSSI = (data: APReading[]) => {
@@ -92,7 +92,7 @@ export function getLatestNativeScan(): APReading[] {
     return _latestNativeScan;
 }
 
-/** Check if a native scan is available (injected via Flutter/Android) */
+/** Check if a native scan is available (injected via Android) */
 export function hasNativeScan(): boolean {
     return _latestNativeScan.length > 0;
 }

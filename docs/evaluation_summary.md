@@ -9,7 +9,7 @@ This document provides the raw empirical evidence supporting the claims made in 
 **Dataset**: MNNIT Campus Graph ($N=30$)
 
 > [!NOTE]
-> All results reported in this document correspond to the final browser-native implementation (React/Three.js/WebXR). Results from earlier iterative prototypes (Unity/ARCore) are excluded to ensure methodological consistency.
+> All results reported in this document correspond to the final browser-native implementation (React/Three.js/WebXR). Results from earlier iterative prototypes are excluded to ensure methodological consistency.
 
 ## 1. A* Pathfinding
 **Methodology**: Tested 20 unique point-to-point routes across the MNNIT campus graph (~850 nodes) using the Chrome V8 engine (Desktop).

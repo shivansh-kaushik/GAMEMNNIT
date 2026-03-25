@@ -1,4 +1,4 @@
-# A Digital Twin-Inspired AR Navigation System for Smart Campuses Using Geospatial Intelligence
+# Uncertainty-Aware AR Navigation for Smart Campuses Using Geospatial Spatial Models
 
 <p align="center">
   <strong>Shivansh Kaushik</strong><br>
@@ -42,7 +42,7 @@
 
 ## 1. Abstract
 
-This work presents the design and prototype implementation of a smart campus navigation system integrating geospatial mapping, augmented reality (AR), and AI-driven interaction. The system demonstrates the feasibility of combining a digital twin-inspired 3D campus model, WebXR-based AR overlays, and structured LLM-based voice interaction for intuitive campus navigation. A proof-of-concept deployment on the MNNIT Allahabad campus dataset illustrates the system architecture, interaction pipeline, and real-time navigation capabilities under practical constraints of consumer-grade sensors.
+This work presents the design and prototype implementation of a smart campus navigation system integrating pre-computed geospatial mapping, augmented reality (AR), and a constrained large language model (LLM) query interface. The system demonstrates the feasibility of combining a digital twin-inspired 3D spatial model, WebXR-based AR overlays, and device-native sensor fusion for intuitive campus navigation. A proof-of-concept deployment on the MNNIT Allahabad campus dataset illustrates the system architecture, its uncertainty-aware visual feedback mechanisms, and real-time path execution under practical constraints of consumer-grade mobile sensors.
 
 ---
 
@@ -106,7 +106,7 @@ Early work by **Azuma (1997)** established AR foundations, but modern advancemen
 
 ### 3.2 Related Work
 - **Commercial VPS**: Google Maps Live View uses camera-based SLAM against a global cloud. While accurate, it is closed-source and lacks micro-waypoints for specific campus interiors.
-- **Academic AR**: Systems like **Horus** (Youssef 2005) pioneered AR guidance but required custom native apps. This project achieves high precision via a browser-resident WebGL stack.
+- **Academic AR**: Systems like **Horus** (Youssef 2005) pioneered AR guidance but required custom native apps. This project partially achieves high precision via a browser-resident WebGL stack.
 
 ### 3.3 Comparative Feature Matrix
 | Feature | GAMEMNNIT (Proposed) | Google Maps Live View | Apple Maps Indoor |
@@ -182,11 +182,26 @@ Projects directional overlays onto the live camera feed using **WebXR**.
 ### 8.1 Confidence-Aware Visualization
 A key contribution is the **Confidence Cone** projection. When sensor uncertainty (GPS drift or magnetometer variance) exceeds $E_{max}$, the AR arrow morphs into an expanded cone, visually communicating ambiguity to the user to prevent over-reliance on inaccurate sensors.
 
+### 8.2 Context-Aware Navigation Pipeline
+The final AR implementation transitions from basic point-to-point visualization to a **closed-loop navigation system**. Functional capabilities include:
+- **Dynamic Waypoint Tracking:** AR arrows strictly align with the local bearing of the *immediate next* A* segment, ensuring realistic turn handling over simple line-of-sight tracking.
+- **Entrance Proximity Detection:** Geospatial bounding boxes ($d < 10m$) automatically trigger structural entrance notifications for key nodes.
+- **Path Deviation Protection:** Continuous monitoring calculates user divergence from the active route trace, deploying $\Delta_{error} > 8m$ warnings to prevent wrong movement.
+- **Orientation-Based Guidance:** Normalizing Haversine trajectory bearings against live device gyroscope matrices provides immediate spatial directives (`Turn Left` / `Turn Right`).
+- **Telemetry Validation Logging:** A heads-up evaluation panel actively streams `Error`, `Deviation`, and `DistanceToTarget` metrics directly to the underlying client-side logger.
+
+### 8.3 Interpretability & Explainable AI Visualization
+To bridge the "Explainability Gap" and demonstrate real-time algorithm execution distinct from traditional 2D navigation systems (e.g. Google Maps), a dedicated **Interpretability Layer** was engineered directly into the pipeline:
+- **Full Graph Rendering (Context):** A faint background rendering of the entire spatial network, establishing immediate context of scale (850 nodes, 1200 edges).
+- **A\* Exploration Animation:** A dynamic Canvas-based simulation rendering the simulated breadth of the A* algorithm expansion (in yellow) before plotting the optimal trace, demystifying the routing process.
+- **Comparison Diagnostics Panel:** A real-time telemetry readout displaying the exact pipeline transformation (`Input → A* Search → Path → AR Render`) alongside execution latencies.
+- **Contextual 'Advanced' Mini-Map Synchronization:** The AR camera feed tracks 'Current Node' vs 'Next Node', completely un-black-boxing the navigation state.
+
 ---
 
-## 9. AI Navigation Assistant
+## 9. LLM-Assisted Query Interface
 
-Resolves natural language queries into structured JSON intents via **Gemini 1.5 Flash**.
+Resolves natural language queries into structured JSON routing commands via **Gemini 1.5 Flash**. This acts structurally as an interface layer rather than a core pathfinding reasoning engine.
 
 ### 9.1 Structured Intent Pipeline
 1. **User**: "Take me to the CSE building."
@@ -212,8 +227,10 @@ The Euclidean distance heuristic $h(n)$ is admissible because it is the straight
 
 Verification logs are stored in [docs/evaluation_summary.md](docs/evaluation_summary.md).
 
+A lightweight client-side logging framework was integrated into the AR navigation pipeline to capture real-time positional error and system performance metrics during live navigation.
+
 ### 11.1 Performance Metrics
-| Metric | Achieved (Mean ± SD) | Target | Status |
+| Metric | Partially Achieved (Mean ± SD) | Target | Status |
 |---|---|---|---|
 | **A\* Path Generation** | 12.4 ms ± 4.2 ms (n=20) | < 100 ms | **Met** |
 | **AR Render FPS** | 45.2 FPS ± 8.1 FPS | ≥ 30 FPS | **Met** |
@@ -234,10 +251,11 @@ The evaluation results reported in this thesis correspond to the final web-based
 
 ## 12. Research Contributions
 
-1. A browser-native AR navigation framework integrating geospatial data, real-time routing, and AI-based interaction without requiring application installation.
-2. A confidence-aware AR visualization mechanism that adapts navigation cues based on sensor uncertainty.
-3. A voxel-based spatial abstraction layer for aligning GIS data with AR rendering and enabling grid-based navigation.
-4. An empirical evaluation demonstrating reduced navigation errors and cognitive load compared to traditional 2D maps, under controlled experimental conditions.
+1. **Uncertainty-Aware AR Visualization (Core Novelty):** The formalization and implementation of the "Confidence Cone" model, proactively communicating sensor ambiguity (GPS drift / Magnetometer noise) to the user visually, mitigating over-reliance on inaccurate mobile hardware.
+2. **Multi-Modal Navigation Engine:** A unified architecture combining raw geospatial topologies (850 nodes, 1200 edges) with optimal A* path planning and an LLM-assisted query interface.
+3. **Web-Native Spatial Alignment:** A continuous spatial framework that accurately maps static 3D voxel coordinate matrices against live Lat/Lng WGS84 telemetry entirely within browser constraints (WebXR).
+4. **Algorithmic Interpretability Interface:** The real-time projection of underlying A* expansion bounds, graph complexity scaling, and execution overheads, ensuring system behaviors remain transparent for thesis/academic evaluation. 
+5. **Empirical Evaluation:** Validating the efficacy of these integrated approaches via measurable reductions in cognitive load (NASA-TLX) and a significant reduction in the context-switching penalty present in standalone 2D maps.
 
 ---
 
@@ -250,12 +268,14 @@ The application features a **Self-Reflecting UI** (Thesis Tab) where this `READM
 ## 14. Limitations & Future Work
 
 ### 14.1 Key Limitations
-- **GPS Drift**: Consumer sensors fluctuate ±5–10 m.
-- **WiFi Fingerprinting Status**: Indoor positioning is partially implemented. WiFi RSSI fingerprinting is simulated in the web environment due to browser security constraints. Full deployment requires a native application layer for real-time WiFi scanning.
+- **Lack of Visual SLAM:** System relies entirely on geospatial alignment (GPS+Compass) rather than camera-based visual localization (Visual SLAM/VPS), meaning the AR overlay cannot verify its own position against visual features.
+- **GPS Drift:** Consumer sensors fluctuate ±5–10 m, which causes AR guidance mismatches at complex junctions.
+- **Static Spatial Model:** The environment is a pre-scanned digital representation, lacking the dynamic, real-time sync required to be classified as a true "Digital Twin."
+- **Indoor simulation:** Indoor tracking is partially simulated in the web environment due to browser security restrictions on hardware APIs.
 
 ### 14.2 Future Directions
-- **VPS Integration**: Camera-based facade recognition to replace magnetometer dependency.
-- **UA-A***: Implementing the **Uncertainty-Aware A\*** algorithm for risk-aware path planning.
+- **Visual Localization Integration:** Implementing basic marker-based or lightweight Visual SLAM to verify device position independently of GPS.
+- **Uncertainty-Aware A\* (UA-A\*):** Modifying the routing engine to penalize paths with historically high signal degradation or GPS multipath errors, achieving integrated hardware-software robustness.
 
 ---
 

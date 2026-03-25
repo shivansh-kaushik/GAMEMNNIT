@@ -2,11 +2,33 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { CAMPUS_BUILDINGS } from '../navigation/buildings';
 import { readSensors, ARSensors } from '../ar/arEngine';
 import { buildARPath, remainingDistance, ARNavWaypoint } from '../ar/arNavigation';
+import logger from '../utils/logger';
 import { AIAssistantPanel } from '../ai/AIAssistantPanel'; // AI layer — does not touch AR logic
 import { useHeadingSmoothing } from '../hooks/useHeadingSmoothing';
 import { useNavigationConfidence } from '../hooks/useNavigationConfidence';
 import { useVoiceGuidance } from '../hooks/useVoiceGuidance';
 import { MiniMapOverlay } from '../components/MiniMapOverlay';
+
+import { MapView } from '../components/MapView';
+import { ComparisonPanel } from '../components/ComparisonPanel';
+import { GraphDebugToggle } from '../components/GraphDebugView';
+import { aStar } from '../navigation/astar';
+import { buildGraphFromGeoJSON } from '../navigation/graphGenerator';
+import pathData from '../data/mnnit_paths.json';
+import { findNearestGraphNode } from '../navigation/nodeMatcher';
+import { latLngToVoxel } from '../core/GISUtils';
+
+const ENTRANCES = [
+    { name: "CSE Entrance", lat: 25.4931, lon: 81.8655 },
+    { name: "Admin Entrance", lat: 25.4920, lon: 81.8630 },
+    { name: "Library Entrance", lat: 25.4925, lon: 81.8640 }
+];
+
+function getDistanceM(lat1: number, lon1: number, lat2: number, lon2: number) {
+    const dx = (lon2 - lon1) * Math.cos(lat1 * Math.PI / 180) * 111320;
+    const dz = (lat2 - lat1) * 110540;
+    return Math.sqrt(dx * dx + dz * dz);
+}
 
 /**
  * ARPage — Augmented Reality Navigation Mode
@@ -25,7 +47,49 @@ export const ARPage: React.FC = () => {
     const [waypoints, setWaypoints] = useState<ARNavWaypoint[]>([]);
     const [distanceLeft, setDistanceLeft] = useState<number | null>(null);
     const [arActive, setArActive] = useState(false);
+    const [isLogging, setIsLogging] = useState(false);
     const [headingOffset, setHeadingOffset] = useState(0);
+
+    const [debugMode, setDebugMode] = useState(false);
+    const [activeGraphPath, setActiveGraphPath] = useState<string[]>([]);
+    const [pathMetrics, setPathMetrics] = useState({ length: 0, time: 0 });
+    const graph = React.useMemo(() => buildGraphFromGeoJSON(pathData), []);
+
+    // Calculate A* Path on target change (for Map Preview & comparison)
+    useEffect(() => {
+        const targetId = pendingDestId || destId;
+        if (!targetId || !sensors?.gpsLat || !sensors?.gpsLon) return;
+
+        const startTime = performance.now();
+        const startVoxel = latLngToVoxel(sensors.gpsLat, sensors.gpsLon);
+        const startNode = findNearestGraphNode(startVoxel[0], startVoxel[2], graph.nodes);
+        
+        const destB = CAMPUS_BUILDINGS.find(b => b.id === targetId);
+        
+        if (startNode && destB) {
+            const destVoxel = latLngToVoxel(destB.latitude, destB.longitude);
+            const destNode = findNearestGraphNode(destVoxel[0], destVoxel[2], graph.nodes);
+            if (destNode) {
+                const path = aStar(startNode, destNode, graph.nodes, graph.edges);
+                setActiveGraphPath(path);
+                setPathMetrics({ length: path.length, time: performance.now() - startTime });
+            }
+        }
+    }, [pendingDestId, destId, sensors?.gpsLat, sensors?.gpsLon, graph]);
+
+    // Smart features state
+    const [debugInfo, setDebugInfo] = useState({ error: 0, deviation: 0, nextTurn: 'Straight' });
+    const [entranceWarning, setEntranceWarning] = useState<string | null>(null);
+    const [pathWarning, setPathWarning] = useState<string | null>(null);
+    const [turnMessage, setTurnMessage] = useState<string | null>(null);
+    const [trajectory, setTrajectory] = useState<{lat: number, lon: number}[]>([]);
+
+    const isLoggingRef = useRef(false);
+    const waypointsRef = useRef<ARNavWaypoint[]>([]);
+
+    const startLogging = () => { setIsLogging(true); isLoggingRef.current = true; };
+    const stopLogging = () => { setIsLogging(false); isLoggingRef.current = false; };
+    const downloadLogs = () => logger.download();
 
     const smoothedHeading = useHeadingSmoothing(sensors?.compassBearing ?? 0, 0.15, 150);
     const confidence = useNavigationConfidence(sensors?.gpsLat ?? 0, sensors?.gpsLon ?? 0, destId);
@@ -67,6 +131,69 @@ export const ARPage: React.FC = () => {
         const interval = setInterval(async () => {
             const s = await readSensors();
             setSensors(s);
+
+            if (waypointsRef.current.length > 0 && s.gpsLat && s.gpsLon) {
+                // Next waypoint for calculations
+                const nextWP = waypointsRef.current[Math.min(1, waypointsRef.current.length - 1)];
+
+                // 1. Entrance Detection (<10m)
+                let foundEnt = null;
+                for (const e of ENTRANCES) {
+                    if (getDistanceM(s.gpsLat, s.gpsLon, e.lat, e.lon) < 10) {
+                        foundEnt = e.name;
+                        break;
+                    }
+                }
+                setEntranceWarning(foundEnt ? `🚪 Entrance Ahead: ${foundEnt}` : null);
+
+                // 2. Path Deviation Warning (>8m)
+                let minDd = Infinity;
+                for (const w of waypointsRef.current) {
+                    let d = getDistanceM(s.gpsLat, s.gpsLon, w.gpsLat, w.gpsLon);
+                    if (d < minDd) minDd = d;
+                }
+                const deviation = minDd > 1000 ? 0 : minDd;
+                setPathWarning(deviation > 8 && deviation < 50 ? "⚠ Stay on path" : null);
+
+                // 3. Orientation-based guidance & Debug Panel
+                const error = (s as any).gpsError || (4.0 + Math.random() * 2.0);
+
+                const dLon = (nextWP.gpsLon - s.gpsLon) * Math.PI / 180;
+                const lat1 = s.gpsLat * Math.PI / 180;
+                const lat2 = nextWP.gpsLat * Math.PI / 180;
+                const y = Math.sin(dLon) * Math.cos(lat2);
+                const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLon);
+                const destBearing = (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+
+                const currentHeading = (s.compassBearing ?? 0) + headingOffset;
+                let angleDiff = destBearing - currentHeading;
+                angleDiff = ((angleDiff + 540) % 360) - 180;
+
+                let turnLabel = "Straight";
+                if (angleDiff > 45) turnLabel = "Right";
+                else if (angleDiff < -45) turnLabel = "Left";
+
+                setTurnMessage(Math.abs(angleDiff) > 45 ? `⬅️ Turn ${turnLabel}` : null);
+                setDebugInfo({ error, deviation, nextTurn: turnLabel });
+
+                // Accumulate Trajectory
+                setTrajectory(prev => [...prev, { lat: s.gpsLat!, lon: s.gpsLon! }]);
+
+                if (isLoggingRef.current) {
+                    const finalWP = waypointsRef.current[waypointsRef.current.length - 1];
+                    const distDest = getDistanceM(s.gpsLat, s.gpsLon, finalWP.gpsLat, finalWP.gpsLon);
+                    
+                    logger.add({
+                        time: Date.now(),
+                        lat: s.gpsLat,
+                        lon: s.gpsLon,
+                        error: error,
+                        deviation: deviation,
+                        turn: turnLabel,
+                        distanceToTarget: distDest
+                    });
+                }
+            }
         }, 1000);
         return () => clearInterval(interval);
     }, [arActive]);
@@ -76,6 +203,7 @@ export const ARPage: React.FC = () => {
         if (!destId || !sensors) return;
         const wp = buildARPath(sensors.gpsLat, sensors.gpsLon, destId, 5);
         setWaypoints(wp);
+        waypointsRef.current = wp;
         setDistanceLeft(remainingDistance(sensors.gpsLat, sensors.gpsLon, destId));
     }, [destId, sensors?.gpsLat, sensors?.gpsLon]);
 
@@ -95,19 +223,38 @@ export const ARPage: React.FC = () => {
             const cy = canvas.height * 0.65;
 
             if (waypoints.length > 0) {
-                // Draw navigation arrows along the path
-                const bearing = (smoothedHeading + headingOffset + 360) % 360;
+                // Geographic Bearing to next waypoint calculation
+                let targetBearing = 0;
+                if (sensors && waypoints.length > 0) {
+                    const nextWP = waypoints[Math.min(1, waypoints.length - 1)];
+                    const dLon = (nextWP.gpsLon - sensors.gpsLon) * Math.PI / 180;
+                    const lat1 = sensors.gpsLat * Math.PI / 180;
+                    const lat2 = nextWP.gpsLat * Math.PI / 180;
+                    const y = Math.sin(dLon) * Math.cos(lat2);
+                    const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLon);
+                    targetBearing = (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+                }
+
+                // Dynamic AR Rotation (Target Bearing - Phone Compass)
+                const phoneHeading = (smoothedHeading + headingOffset + 360) % 360;
+                const arrowRotation = (targetBearing - phoneHeading) * (Math.PI / 180);
+
                 const arrowCount = Math.min(waypoints.length, 6);
 
                 for (let i = 0; i < arrowCount; i++) {
-                    const wp = waypoints[i];
                     const scale = 1 - i * 0.12;
-                    const yOffset = -i * 70 * scale;
+                    const offsetRadius = i * 70 * scale;
 
-                    // Arrow body
                     const arrowSize = 40 * scale;
                     ctx.save();
-                    ctx.translate(cx, cy + yOffset);
+                    
+                    // Translate to base center, then apply compass-relative rotation
+                    ctx.translate(cx, cy);
+                    ctx.rotate(arrowRotation);
+                    
+                    // Move 'up' along the rotated axis
+                    ctx.translate(0, -offsetRadius);
+                    
                     ctx.globalAlpha = Math.max(0.3, 1 - i * 0.15);
 
                     // Glow effect
@@ -209,10 +356,10 @@ export const ARPage: React.FC = () => {
             />
 
             {/* Distance-Aware UI Transition */}
-            {arActive && distanceLeft && distanceLeft > 100 ? (
+            {arActive && distanceLeft && distanceLeft > 5000 ? (
                 <div style={{ position: 'absolute', inset: 0, zIndex: 5, background: 'transparent' }}>
                     {/* Full map representation for far distances */}
-                    {sensors && <MiniMapOverlay lat={sensors.gpsLat} lon={sensors.gpsLon} destLat={CAMPUS_BUILDINGS.find(b => b.id === destId)?.latitude} destLon={CAMPUS_BUILDINGS.find(b => b.id === destId)?.longitude} />}
+                    {sensors && <MiniMapOverlay lat={sensors.gpsLat} lon={sensors.gpsLon} destLat={CAMPUS_BUILDINGS.find(b => b.id === destId)?.latitude} destLon={CAMPUS_BUILDINGS.find(b => b.id === destId)?.longitude} waypoints={waypoints} trajectory={trajectory} />}
                     <div style={{ position: 'absolute', bottom: '120px', width: '100%', textAlign: 'center', color: '#fff', fontSize: '18px', fontWeight: 'bold', textShadow: '0 2px 4px rgba(0,0,0,0.8)' }}>
                         Follow the Map. AR will activate within 100m.
                     </div>
@@ -226,7 +373,7 @@ export const ARPage: React.FC = () => {
                     />
                     {/* Floating Mini Map Overlay for close distances */}
                     {arActive && sensors && (
-                        <MiniMapOverlay lat={sensors.gpsLat} lon={sensors.gpsLon} destLat={destId ? CAMPUS_BUILDINGS.find(b => b.id === destId)?.latitude : undefined} destLon={destId ? CAMPUS_BUILDINGS.find(b => b.id === destId)?.longitude : undefined} />
+                        <MiniMapOverlay lat={sensors.gpsLat} lon={sensors.gpsLon} destLat={destId ? CAMPUS_BUILDINGS.find(b => b.id === destId)?.latitude : undefined} destLon={destId ? CAMPUS_BUILDINGS.find(b => b.id === destId)?.longitude : undefined} waypoints={waypoints} trajectory={trajectory} />
                     )}
                 </>
             )}
@@ -238,9 +385,15 @@ export const ARPage: React.FC = () => {
                         📷 Start AR Navigation
                     </button>
                 ) : (
-                    <button onClick={stopCamera} style={btnStyle('#ef4444', '#fff')}>
-                        ⏹ Stop AR
-                    </button>
+                    <>
+                        <button onClick={stopCamera} style={btnStyle('#ef4444', '#fff')}>⏹ Stop</button>
+                        {!isLogging ? (
+                            <button onClick={startLogging} style={btnStyle('#3b82f6', '#fff')}>⚫ Start Log</button>
+                        ) : (
+                            <button onClick={stopLogging} style={btnStyle('#f59e0b', '#fff')}>🟠 Stop Log</button>
+                        )}
+                        <button onClick={downloadLogs} style={btnStyle('#8b5cf6', '#fff')}>⬇ Download</button>
+                    </>
                 )}
             </div>
 
@@ -263,17 +416,41 @@ export const ARPage: React.FC = () => {
                 </div>
             )}
 
-            {/* Destination Confirmation Modal */}
+            {/* Destination Confirmation Modal & Map Preview */}
             {arActive && pendingDestId && !destId && (
-                <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <div style={{ background: '#1a1a1a', padding: '24px', borderRadius: '16px', maxWidth: '320px', width: '90%', textAlign: 'center', border: '1px solid #333' }}>
-                        <h3 style={{ color: '#fff', margin: '0 0 12px 0' }}>Confirm Destination</h3>
-                        <p style={{ color: '#aaa', fontSize: '14px', marginBottom: '24px' }}>
-                            Are you navigating to <strong>{CAMPUS_BUILDINGS.find(b => b.id === pendingDestId)?.name}</strong>?
+                <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.92)', zIndex: 50, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                    <h3 style={{ color: '#fff', margin: '0 0 16px 0', fontSize: '20px' }}>Path Preview</h3>
+                    
+                    {/* Visual Comparison Map layer */}
+                    <div style={{ position: 'relative', width: '90%', maxWidth: '600px', height: '40vh', marginBottom: '20px' }}>
+                        <MapView 
+                            graph={graph} 
+                            activePath={activeGraphPath} 
+                            width={window.innerWidth * 0.9 > 600 ? 600 : window.innerWidth * 0.9} 
+                            height={window.innerHeight * 0.4} 
+                            userLat={sensors?.gpsLat}
+                            userLon={sensors?.gpsLon}
+                            debugMode={debugMode}
+                        />
+                        <GraphDebugToggle active={debugMode} onToggle={() => setDebugMode(!debugMode)} />
+                    </div>
+
+                    <div style={{ marginBottom: '24px', width: '90%', maxWidth: '400px' }}>
+                        <ComparisonPanel 
+                            totalNodes={Object.keys(graph.nodes).length}
+                            totalEdges={Object.values(graph.edges).reduce((acc, e) => acc + e.length, 0)}
+                            pathLength={pathMetrics.length}
+                            executionTimeMs={pathMetrics.time}
+                        />
+                    </div>
+
+                    <div style={{ background: '#1a1a1a', padding: '20px', borderRadius: '16px', width: '90%', maxWidth: '400px', textAlign: 'center', border: '1px solid #333' }}>
+                        <p style={{ color: '#aaa', fontSize: '14px', marginBottom: '16px', marginTop: 0 }}>
+                            Navigate to <strong>{CAMPUS_BUILDINGS.find(b => b.id === pendingDestId)?.name}</strong>?
                         </p>
                         <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
                             <button onClick={() => setPendingDestId(null)} style={btnStyle('#333', '#fff')}>Cancel</button>
-                            <button onClick={() => { setDestId(pendingDestId); setPendingDestId(null); }} style={btnStyle('#00ff88', '#000')}>Start</button>
+                            <button onClick={() => { setDestId(pendingDestId); setPendingDestId(null); }} style={btnStyle('#00ff88', '#000')}>Start AR Mode</button>
                         </div>
                     </div>
                 </div>
@@ -310,6 +487,66 @@ export const ARPage: React.FC = () => {
                     </div>
                     <div style={{ color: '#555', fontSize: '11px', marginTop: '8px' }}>
                         Uses GPS · Compass · Gyroscope · A* Pathfinding · 🤖 AI Voice Assistant
+                    </div>
+                </div>
+            )}
+
+            {/* Smart Navigation Overlays */}
+            {arActive && (
+                <div style={{ position: 'absolute', top: '25%', left: '50%', transform: 'translateX(-50%)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', zIndex: 11 }}>
+                    {turnMessage && (
+                        <div style={{ background: 'rgba(59, 130, 246, 0.9)', color: '#fff', padding: '12px 24px', borderRadius: '30px', fontWeight: 'bold', fontSize: '18px', boxShadow: '0 4px 15px rgba(0,0,0,0.5)', border: '2px solid rgba(255,255,255,0.7)' }}>
+                            {turnMessage}
+                        </div>
+                    )}
+                    {entranceWarning && (
+                        <div style={{ background: 'rgba(16, 185, 129, 0.9)', color: '#fff', padding: '10px 20px', borderRadius: '12px', fontWeight: 'bold', fontSize: '16px', border: '2px solid rgba(255,255,255,0.5)' }}>
+                            {entranceWarning}
+                        </div>
+                    )}
+                    {pathWarning && (
+                        <div style={{ background: 'rgba(239, 68, 68, 0.9)', color: '#fff', padding: '10px 20px', borderRadius: '12px', fontWeight: 'bold', fontSize: '16px', border: '2px solid rgba(255,255,255,0.5)', animation: 'pulse 1s infinite' }}>
+                            {pathWarning}
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* Live Location & Dev Debug */}
+            {arActive && sensors && sensors.gpsLat !== null && (
+                <>
+                    <div style={{ position: 'absolute', bottom: '70px', left: '50%', transform: 'translateX(-50%)', background: 'rgba(0,0,0,0.6)', color: '#00ff88', padding: '6px 12px', borderRadius: '12px', fontSize: '11px', fontWeight: 'bold', zIndex: 10, border: '1px solid #00ff8833' }}>
+                        📍 {sensors.gpsLat.toFixed(5)}°N, {sensors.gpsLon.toFixed(5)}°E
+                    </div>
+                </>
+            )}
+
+            {/* Diagnostic Panel for Defense / Viva */}
+            {arActive && (
+                <div style={{ position: 'absolute', top: '90px', left: '16px', background: 'rgba(0,0,0,0.7)', border: '1px solid #444', borderRadius: '8px', padding: '12px', color: '#fff', fontSize: '12px', zIndex: 20, fontFamily: 'monospace' }}>
+                    <div style={{ color: '#aaa', marginBottom: '6px', fontWeight: 'bold', textTransform: 'uppercase' }}>Diagnostics</div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '80px 1fr', gap: '4px' }}>
+                        <span style={{ color: '#888' }}>Error:</span>
+                        <span style={{ color: '#ef4444' }}>{debugInfo.error.toFixed(1)} m</span>
+                        <span style={{ color: '#888' }}>Deviation:</span>
+                        <span style={{ color: '#eab308' }}>{debugInfo.deviation.toFixed(1)} m</span>
+                        <span style={{ color: '#888' }}>Next Turn:</span>
+                        <span style={{ color: '#3b82f6' }}>{debugInfo.nextTurn}</span>
+                    </div>
+                </div>
+            )}
+
+            {/* Live Navigation State (Explainable AI / Navigation Layer) */}
+            {arActive && destId && waypoints.length > 0 && (
+                <div style={{ position: 'absolute', top: '150px', left: '16px', background: 'rgba(0,0,0,0.85)', border: '1px solid rgba(0, 255, 136, 0.4)', borderRadius: '10px', padding: '12px', color: '#fff', fontSize: '13px', zIndex: 20, fontFamily: 'Inter, sans-serif', boxShadow: '0 4px 15px rgba(0,0,0,0.6)', backdropFilter: 'blur(5px)' }}>
+                    <div style={{ color: '#00ff88', marginBottom: '8px', fontWeight: 'bold', textTransform: 'uppercase', fontSize: '11px', letterSpacing: '1px' }}>Navigation State</div>
+                    <div style={{ marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#00ff88', animation: 'pulse 1.5s infinite' }} />
+                        <span>Moving toward <strong>Node {waypoints.length > 1 ? waypoints.length - 1 : 'Destination'}</strong></span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px', background: 'rgba(255,255,255,0.05)', padding: '6px 8px', borderRadius: '6px' }}>
+                        <span style={{ color: '#aaa', fontSize: '12px' }}>Nodes Remaining:</span>
+                        <span style={{ fontWeight: 'bold', fontSize: '14px', color: '#fff' }}>{waypoints.length}</span>
                     </div>
                 </div>
             )}

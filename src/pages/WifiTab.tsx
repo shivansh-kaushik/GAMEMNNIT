@@ -160,7 +160,7 @@ export const WifiTab: React.FC = () => {
             <Card title="📡 WiFi RSSI Scanning" accent={RED}>
                 <Notice color={RED}>
                     Browser security restrictions prevent websites from scanning nearby WiFi networks.
-                    Real WiFi RSSI scanning requires a <strong>native Android / Flutter app</strong> with CHANGE_WIFI_STATE and ACCESS_FINE_LOCATION permissions.
+                    Real WiFi RSSI scanning requires a <strong>native Android app</strong> with CHANGE_WIFI_STATE and ACCESS_FINE_LOCATION permissions.
                 </Notice>
 
                 {/* Native mobile injection bridge */}
@@ -216,7 +216,7 @@ export const WifiTab: React.FC = () => {
             {/* Future note */}
             <Card title="🚀 Roadmap" accent={YLW}>
                 <Notice color={YLW}>
-                    Real-time WiFi RSSI scanning will be enabled in the <strong>mobile app</strong> using native Android WifiManager / Flutter wifi_scan. Barometer floor detection works on <strong>Android Chrome</strong> with Generic Sensor API.
+                    Real-time WiFi RSSI scanning will be enabled in the <strong>mobile app</strong> using native Android WifiManager. Barometer floor detection works on <strong>Android Chrome</strong> with Generic Sensor API.
                 </Notice>
             </Card>
         </div>

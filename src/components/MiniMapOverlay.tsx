@@ -5,14 +5,18 @@ import React, { useRef, useEffect } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 
+import { ARNavWaypoint } from '../ar/arNavigation';
+
 interface MiniMapProps {
   lat: number;
   lon: number;
   destLat?: number;
   destLon?: number;
+  waypoints?: ARNavWaypoint[];
+  trajectory?: { lat: number, lon: number }[];
 }
 
-export const MiniMapOverlay: React.FC<MiniMapProps> = ({ lat, lon, destLat, destLon }) => {
+export const MiniMapOverlay: React.FC<MiniMapProps> = ({ lat, lon, destLat, destLon, waypoints, trajectory }) => {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const marker = useRef<mapboxgl.Marker | null>(null);
@@ -44,6 +48,54 @@ export const MiniMapOverlay: React.FC<MiniMapProps> = ({ lat, lon, destLat, dest
         .setLngLat([destLon, destLat])
         .addTo(map.current);
     }
+    
+    // Setup geojson sources for paths
+    map.current.on('load', () => {
+      if(!map.current) return;
+      
+      // Target Planned Route
+      map.current.addSource('planned-route', {
+        type: 'geojson',
+        data: { type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: [] } }
+      });
+      map.current.addLayer({
+        id: 'planned-route-line',
+        type: 'line',
+        source: 'planned-route',
+        layout: { 'line-join': 'round', 'line-cap': 'round' },
+        paint: { 'line-color': '#00ff88', 'line-width': 5, 'line-opacity': 0.8 } // High visibility path
+      });
+
+      // Target Nodes along route
+      map.current.addSource('route-nodes', {
+        type: 'geojson',
+        data: { type: 'FeatureCollection', features: [] }
+      });
+      map.current.addLayer({
+        id: 'route-nodes-points',
+        type: 'circle',
+        source: 'route-nodes',
+        paint: {
+          'circle-radius': ['get', 'radius'],
+          'circle-color': ['get', 'color'],
+          'circle-stroke-width': 2,
+          'circle-stroke-color': '#ffffff'
+        }
+      });
+
+      // User's Real Trajectory
+      map.current.addSource('user-trajectory', {
+        type: 'geojson',
+        data: { type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: [] } }
+      });
+      map.current.addLayer({
+        id: 'user-trajectory-line',
+        type: 'line',
+        source: 'user-trajectory',
+        layout: { 'line-join': 'round', 'line-cap': 'round' },
+        paint: { 'line-color': '#10b981', 'line-width': 4, 'line-dasharray': [1, 2] } // Dotted Green Trace
+      });
+    });
   }, []);
 
   // Update map center seamlessly and markers
@@ -70,6 +122,50 @@ export const MiniMapOverlay: React.FC<MiniMapProps> = ({ lat, lon, destLat, dest
       destMarker.current = null;
     }
   }, [destLat, destLon]);
+
+  // Sync polyline lines
+  useEffect(() => {
+    if (!map.current || !map.current.isStyleLoaded()) return;
+
+    // Draw planned path
+    if (waypoints && waypoints.length > 0) {
+      const coords = waypoints.map(w => [w.gpsLon, w.gpsLat]);
+      (map.current.getSource('planned-route') as mapboxgl.GeoJSONSource)?.setData({
+        type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: coords }
+      });
+
+      // Highlight Next Node (index 1) and Final Node (last)
+      const features: GeoJSON.Feature<GeoJSON.Point>[] = [];
+      if (waypoints.length > 1) {
+          features.push({
+              type: 'Feature',
+              properties: { color: '#eab308', radius: 6 }, // Next Node: Yellow
+              geometry: { type: 'Point', coordinates: [waypoints[1].gpsLon, waypoints[1].gpsLat] }
+          });
+      }
+      features.push({
+          type: 'Feature',
+          properties: { color: '#ef4444', radius: 8 }, // Final Node: Red
+          geometry: { type: 'Point', coordinates: [waypoints[waypoints.length - 1].gpsLon, waypoints[waypoints.length - 1].gpsLat] }
+      });
+      (map.current.getSource('route-nodes') as mapboxgl.GeoJSONSource)?.setData({
+          type: 'FeatureCollection', features
+      });
+
+    } else {
+      (map.current.getSource('route-nodes') as mapboxgl.GeoJSONSource)?.setData({
+          type: 'FeatureCollection', features: []
+      });
+    }
+
+    // Draw history trace
+    if (trajectory && trajectory.length > 0) {
+      const coords = trajectory.map(t => [t.lon, t.lat]);
+      (map.current.getSource('user-trajectory') as mapboxgl.GeoJSONSource)?.setData({
+        type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: coords }
+      });
+    }
+  }, [waypoints, trajectory]);
 
   return (
     <div 
