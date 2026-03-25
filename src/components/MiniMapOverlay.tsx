@@ -29,22 +29,35 @@ export const MiniMapOverlay: React.FC<MiniMapProps> = ({ lat, lon, destLat, dest
     const token = import.meta.env.VITE_MAPBOX_TOKEN || '';
     mapboxgl.accessToken = token;
 
+    // Helper to create glowing dot marker
+    const createDotMarker = (color: string, glowColor: string) => {
+      const el = document.createElement('div');
+      el.className = 'radar-dot';
+      el.style.width = '14px';
+      el.style.height = '14px';
+      el.style.backgroundColor = color;
+      el.style.borderRadius = '50%';
+      el.style.border = '2px solid #fff';
+      el.style.boxShadow = `0 0 10px ${glowColor}, 0 0 20px ${glowColor}`;
+      return el;
+    };
+
     map.current = new mapboxgl.Map({
       container: mapContainer.current,
-      style: 'mapbox://styles/mapbox/streets-v12',
+      style: 'mapbox://styles/mapbox/dark-v11', // Dark themed tech map
       center: [lon, lat],
       zoom: 17,
-      interactive: false, // Prevents interfering with AR swipes
+      interactive: true, // Enabled zoom & pan
       attributionControl: false
     });
 
-    // Simple tracking marker
-    marker.current = new mapboxgl.Marker({ color: '#3b82f6' })
+    // Custom glowing tracking marker
+    marker.current = new mapboxgl.Marker({ element: createDotMarker('#00ff88', '#00ff88') })
       .setLngLat([lon, lat])
       .addTo(map.current);
       
     if (destLat && destLon) {
-      destMarker.current = new mapboxgl.Marker({ color: '#ef4444' })
+      destMarker.current = new mapboxgl.Marker({ element: createDotMarker('#ef4444', '#ef4444') })
         .setLngLat([destLon, destLat])
         .addTo(map.current);
     }
@@ -111,7 +124,14 @@ export const MiniMapOverlay: React.FC<MiniMapProps> = ({ lat, lon, destLat, dest
   useEffect(() => {
     if (map.current && destLat && destLon) {
       if (!destMarker.current) {
-        destMarker.current = new mapboxgl.Marker({ color: '#ef4444' })
+        const el = document.createElement('div');
+        el.style.width = '14px'; el.style.height = '14px';
+        el.style.backgroundColor = '#ef4444';
+        el.style.borderRadius = '50%';
+        el.style.border = '2px solid #fff';
+        el.style.boxShadow = '0 0 10px #ef4444, 0 0 20px #ef4444';
+
+        destMarker.current = new mapboxgl.Marker({ element: el })
           .setLngLat([destLon, destLat])
           .addTo(map.current);
       } else {
@@ -180,7 +200,7 @@ export const MiniMapOverlay: React.FC<MiniMapProps> = ({ lat, lon, destLat, dest
         boxShadow: '0 0 15px rgba(0,0,0,0.5)',
         overflow: 'hidden',
         zIndex: 100,
-        pointerEvents: 'none'
+        pointerEvents: 'auto'
       }}
     >
       <div ref={mapContainer} style={{ width: '100%', height: '100%' }} />
