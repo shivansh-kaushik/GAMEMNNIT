@@ -18,6 +18,7 @@ import pathData from '../data/mnnit_paths.json';
 import { findNearestGraphNode } from '../navigation/nodeMatcher';
 import { latLngToVoxel } from '../core/GISUtils';
 import { advancedSnapToPath, SnappedLocation } from '../navigation/pathSnapping';
+import { MarkerScanner, MarkerPayload } from '../ar/MarkerLocalization';
 
 const ENTRANCES = [
     { name: "CSE Entrance", lat: 25.4931, lon: 81.8655 },
@@ -90,6 +91,11 @@ export const ARPage: React.FC = () => {
     const prevSnapRef = useRef<SnappedLocation | null>(null);
     const [snapUI, setSnapUI] = useState<{isLocked: boolean, confidence: number}>({ isLocked: false, confidence: 0 });
 
+    // Level 2: Ground Truth Tracking
+    const markerScannerRef = useRef<MarkerScanner>(new MarkerScanner());
+    const [gtAnchorUI, setGtAnchorUI] = useState<{active: boolean, id: string}>({ active: false, id: '' });
+    const gtOffsetRef = useRef({ lat: 0, lon: 0 });
+
     const startLogging = () => { setIsLogging(true); isLoggingRef.current = true; };
     const stopLogging = () => { setIsLogging(false); isLoggingRef.current = false; };
     const downloadLogs = () => logger.download();
@@ -133,6 +139,13 @@ export const ARPage: React.FC = () => {
         if (!arActive) return;
         const interval = setInterval(async () => {
             const s = await readSensors();
+            
+            // --- LEVEL 2: APPLY GROUND TRUTH OFFSETS ---
+            if (s.gpsLat && s.gpsLon) {
+                s.gpsLat += gtOffsetRef.current.lat;
+                s.gpsLon += gtOffsetRef.current.lon;
+            }
+            
             setSensors(s);
 
             if (waypointsRef.current.length > 0 && s.gpsLat && s.gpsLon) {
@@ -143,8 +156,8 @@ export const ARPage: React.FC = () => {
                     s.gpsLat, s.gpsLon, 
                     currentHeading, 
                     waypointsRef.current, 
-                    prevSnapRef.current, 
-                    20 // slightly looser tolerance for progressive lock
+                    gtAnchorUI.active ? null : prevSnapRef.current, // Wipe kalman filter if just anchored
+                    20
                 );
                 
                 prevSnapRef.current = snapped;
@@ -216,6 +229,40 @@ export const ARPage: React.FC = () => {
         }, 1000);
         return () => clearInterval(interval);
     }, [arActive]);
+
+    // ---------- Level 2 Ground Truth Marker Scanning ----------
+    const handleMarkerDetected = useCallback((payload: MarkerPayload) => {
+        if (!sensors || !sensors.gpsLat || !sensors.gpsLon) return;
+
+        console.log("📍 MARKER DETECTED! Hard Resetting Ground Truth:", payload);
+
+        // Calculate discrepancy between Raw GPS and Ground Truth
+        const drLat = payload.lat - (sensors.gpsLat - gtOffsetRef.current.lat);
+        const drLon = payload.lon - (sensors.gpsLon - gtOffsetRef.current.lon);
+        
+        gtOffsetRef.current = { lat: drLat, lon: drLon };
+
+        // Hard reset the compass bearing if requested by the marker
+        const newHeadingOffset = payload.bearing - (sensors.compassBearing ?? 0);
+        setHeadingOffset(newHeadingOffset);
+
+        // Clear path snapping temporal buffers
+        prevSnapRef.current = null;
+        setGtAnchorUI({ active: true, id: payload.id });
+
+        // Trigger Audio Warning
+        const msg = new SpeechSynthesisUtterance("Ground truth established.");
+        window.speechSynthesis.speak(msg);
+
+    }, [sensors]);
+
+    useEffect(() => {
+        if (arActive && videoRef.current) {
+            markerScannerRef.current.start(videoRef.current, handleMarkerDetected);
+        } else {
+            markerScannerRef.current.stop();
+        }
+    }, [arActive, handleMarkerDetected]);
 
     // ---------- Build waypoints when destination changes ----------
     useEffect(() => {
@@ -537,9 +584,14 @@ export const ARPage: React.FC = () => {
                     <div style={{ background: 'rgba(0,0,0,0.6)', color: '#00ff88', padding: '6px 12px', borderRadius: '12px', fontSize: '11px', fontWeight: 'bold', border: '1px solid #00ff8833' }}>
                         📍 {sensors.gpsLat.toFixed(5)}°N, {sensors.gpsLon.toFixed(5)}°E
                     </div>
-                    {destId && (
+                    {destId && !gtAnchorUI.active && (
                         <div style={{ background: snapUI.isLocked ? 'rgba(16, 185, 129, 0.9)' : 'rgba(245, 158, 11, 0.9)', color: '#fff', padding: '6px 12px', borderRadius: '12px', fontSize: '11px', fontWeight: 'bold', border: '1px solid rgba(255,255,255,0.4)', transition: 'background 0.3s' }}>
                             {snapUI.isLocked ? `🔒 Path Locked (${(snapUI.confidence * 100).toFixed(0)}%)` : '🔄 Reacquiring Route...'}
+                        </div>
+                    )}
+                    {gtAnchorUI.active && (
+                        <div style={{ background: 'rgba(139, 92, 246, 0.9)', color: '#fff', padding: '6px 12px', borderRadius: '12px', fontSize: '11px', fontWeight: 'bold', border: '1px solid rgba(255,255,255,0.8)', animation: 'pulse 2s infinite' }}>
+                            🎯 Ground Truth Anchor: {gtAnchorUI.id}
                         </div>
                     )}
                 </div>
