@@ -17,6 +17,7 @@ import { buildGraphFromGeoJSON } from '../navigation/graphGenerator';
 import pathData from '../data/mnnit_paths.json';
 import { findNearestGraphNode } from '../navigation/nodeMatcher';
 import { latLngToVoxel } from '../core/GISUtils';
+import { snapToPath } from '../navigation/pathSnapping';
 
 const ENTRANCES = [
     { name: "CSE Entrance", lat: 25.4931, lon: 81.8655 },
@@ -133,6 +134,21 @@ export const ARPage: React.FC = () => {
             setSensors(s);
 
             if (waypointsRef.current.length > 0 && s.gpsLat && s.gpsLon) {
+                // --- LEVEL 1: PATH SNAPPING & LOCKING ---
+                const snapped = snapToPath(s.gpsLat, s.gpsLon, waypointsRef.current, 15);
+                
+                // Override raw jittery GPS with magnetically snapped path coordinates
+                s.gpsLat = snapped.lat;
+                s.gpsLon = snapped.lon;
+
+                if (!snapped.isLocked) {
+                    setPathWarning("⚠ Path Lock Lost: GPS drift high");
+                } else {
+                    setPathWarning(null);
+                }
+
+                const deviation = snapped.crossTrackError;
+
                 // Next waypoint for calculations
                 const nextWP = waypointsRef.current[Math.min(1, waypointsRef.current.length - 1)];
 
@@ -145,15 +161,6 @@ export const ARPage: React.FC = () => {
                     }
                 }
                 setEntranceWarning(foundEnt ? `🚪 Entrance Ahead: ${foundEnt}` : null);
-
-                // 2. Path Deviation Warning (>8m)
-                let minDd = Infinity;
-                for (const w of waypointsRef.current) {
-                    let d = getDistanceM(s.gpsLat, s.gpsLon, w.gpsLat, w.gpsLon);
-                    if (d < minDd) minDd = d;
-                }
-                const deviation = minDd > 1000 ? 0 : minDd;
-                setPathWarning(deviation > 8 && deviation < 50 ? "⚠ Stay on path" : null);
 
                 // 3. Orientation-based guidance & Debug Panel
                 const error = (s as any).gpsError || (4.0 + Math.random() * 2.0);
