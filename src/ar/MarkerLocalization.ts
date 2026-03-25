@@ -65,25 +65,40 @@ export class MarkerScanner {
 
     private parsePayload(data: string) {
         try {
-            // Expected format: JSON {"id": "ACAD_MAIN", "lat": 25.4947, "lon": 81.8641, "bearing": 90}
-            const payload = JSON.parse(data) as MarkerPayload;
-            if (payload.lat && payload.lon && payload.bearing !== undefined) {
-                
-                // Throttle detection to prevent spamming
-                this.stop(); 
-                
-                if (this.onDetect) {
-                    this.onDetect(payload);
-                }
+            const parsed = JSON.parse(data);
 
-                // Resume scanning after 10 seconds to avoid duplicate lock loops on the same marker
-                setTimeout(() => {
-                    this.isScanning = true;
-                    this.scanInterval = setInterval(() => this.scanFrame(), 500);
-                }, 10000);
+            // --- VERSIONED PAYLOAD VALIDATION ---
+            // Reject: non-navigation QRs, unknown versions, or missing data
+            if (parsed.type !== 'AR_NAV_QR') {
+                console.log('Non-navigation QR ignored:', data.slice(0, 40));
+                return;
             }
+            if (parsed.version !== 1) {
+                console.warn('Unknown QR payload version. Update the app.', parsed.version);
+                return;
+            }
+            if (!parsed.data || !parsed.data.lat || !parsed.data.lon || parsed.data.bearing === undefined) {
+                console.warn('Malformed AR_NAV_QR payload — missing required fields.');
+                return;
+            }
+
+            const payload = parsed.data as MarkerPayload;
+            
+            // Log checksum for audit trail (client-side validation only)
+            console.log(`📍 GROUND TRUTH ANCHOR: ${payload.id} | checksum: ${parsed.checksum}`);
+
+            // Throttle: stop scanning, fire callback, resume after 10s
+            this.stop();
+            if (this.onDetect) {
+                this.onDetect(payload);
+            }
+            setTimeout(() => {
+                this.isScanning = true;
+                this.scanInterval = setInterval(() => this.scanFrame(), 500);
+            }, 10000);
+
         } catch (e) {
-            console.log('Detected non-navigation QR Code:', data);
+            // Silent fail for unreadable frames
         }
     }
 }
