@@ -17,7 +17,7 @@ import { buildGraphFromGeoJSON } from '../navigation/graphGenerator';
 import pathData from '../data/mnnit_paths.json';
 import { findNearestGraphNode } from '../navigation/nodeMatcher';
 import { latLngToVoxel } from '../core/GISUtils';
-import { snapToPath } from '../navigation/pathSnapping';
+import { advancedSnapToPath, SnappedLocation } from '../navigation/pathSnapping';
 
 const ENTRANCES = [
     { name: "CSE Entrance", lat: 25.4931, lon: 81.8655 },
@@ -87,6 +87,8 @@ export const ARPage: React.FC = () => {
 
     const isLoggingRef = useRef(false);
     const waypointsRef = useRef<ARNavWaypoint[]>([]);
+    const prevSnapRef = useRef<SnappedLocation | null>(null);
+    const [snapUI, setSnapUI] = useState<{isLocked: boolean, confidence: number}>({ isLocked: false, confidence: 0 });
 
     const startLogging = () => { setIsLogging(true); isLoggingRef.current = true; };
     const stopLogging = () => { setIsLogging(false); isLoggingRef.current = false; };
@@ -134,15 +136,26 @@ export const ARPage: React.FC = () => {
             setSensors(s);
 
             if (waypointsRef.current.length > 0 && s.gpsLat && s.gpsLon) {
-                // --- LEVEL 1: PATH SNAPPING & LOCKING ---
-                const snapped = snapToPath(s.gpsLat, s.gpsLon, waypointsRef.current, 15);
+                const currentHeading = (s.compassBearing ?? 0) + headingOffset;
                 
+                // --- LEVEL 1.5: ADVANCED TEMPORAL PATH SNAPPING ---
+                const snapped = advancedSnapToPath(
+                    s.gpsLat, s.gpsLon, 
+                    currentHeading, 
+                    waypointsRef.current, 
+                    prevSnapRef.current, 
+                    20 // slightly looser tolerance for progressive lock
+                );
+                
+                prevSnapRef.current = snapped;
+                setSnapUI({ isLocked: snapped.isLocked, confidence: snapped.confidence });
+
                 // Override raw jittery GPS with magnetically snapped path coordinates
                 s.gpsLat = snapped.lat;
                 s.gpsLon = snapped.lon;
 
                 if (!snapped.isLocked) {
-                    setPathWarning("⚠ Path Lock Lost: GPS drift high");
+                    setPathWarning("⚠ Path Lock Lost: High GPS drift");
                 } else {
                     setPathWarning(null);
                 }
@@ -172,7 +185,6 @@ export const ARPage: React.FC = () => {
                 const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLon);
                 const destBearing = (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
 
-                const currentHeading = (s.compassBearing ?? 0) + headingOffset;
                 let angleDiff = destBearing - currentHeading;
                 angleDiff = ((angleDiff + 540) % 360) - 180;
 
@@ -521,11 +533,16 @@ export const ARPage: React.FC = () => {
 
             {/* Live Location & Dev Debug */}
             {arActive && sensors && sensors.gpsLat !== null && (
-                <>
-                    <div style={{ position: 'absolute', bottom: '70px', left: '50%', transform: 'translateX(-50%)', background: 'rgba(0,0,0,0.6)', color: '#00ff88', padding: '6px 12px', borderRadius: '12px', fontSize: '11px', fontWeight: 'bold', zIndex: 10, border: '1px solid #00ff8833' }}>
+                <div style={{ position: 'absolute', bottom: '70px', left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: '8px', zIndex: 10 }}>
+                    <div style={{ background: 'rgba(0,0,0,0.6)', color: '#00ff88', padding: '6px 12px', borderRadius: '12px', fontSize: '11px', fontWeight: 'bold', border: '1px solid #00ff8833' }}>
                         📍 {sensors.gpsLat.toFixed(5)}°N, {sensors.gpsLon.toFixed(5)}°E
                     </div>
-                </>
+                    {destId && (
+                        <div style={{ background: snapUI.isLocked ? 'rgba(16, 185, 129, 0.9)' : 'rgba(245, 158, 11, 0.9)', color: '#fff', padding: '6px 12px', borderRadius: '12px', fontSize: '11px', fontWeight: 'bold', border: '1px solid rgba(255,255,255,0.4)', transition: 'background 0.3s' }}>
+                            {snapUI.isLocked ? `🔒 Path Locked (${(snapUI.confidence * 100).toFixed(0)}%)` : '🔄 Reacquiring Route...'}
+                        </div>
+                    )}
+                </div>
             )}
 
             {/* Diagnostic Panel for Defense / Viva */}
