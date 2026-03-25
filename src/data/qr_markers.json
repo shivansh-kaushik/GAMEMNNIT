@@ -1,0 +1,160 @@
+{
+    "metadata": {
+        "campus": "MNNIT Allahabad",
+        "total_markers": 15,
+        "strategy": "Decision-Point Anchoring",
+        "version": "1.0.0"
+    },
+    "markers": [
+        {
+            "id": "ACAD_MAIN_GATE",
+            "type": "entrance_anchor",
+            "priority": "high",
+            "radius": 5,
+            "lat": 25.4947,
+            "lon": 81.8641,
+            "bearing": 90,
+            "description": "Main entrance of Academic Building. High traffic, indoor/outdoor transition."
+        },
+        {
+            "id": "ADMIN_RECEPTION",
+            "type": "entrance_anchor",
+            "priority": "high",
+            "radius": 5,
+            "lat": 25.4945,
+            "lon": 81.8625,
+            "bearing": 180,
+            "description": "Admin Block reception. GPS gets highly distorted due to heavy concrete."
+        },
+        {
+            "id": "LIBRARY_PORCH",
+            "type": "entrance_anchor",
+            "priority": "high",
+            "radius": 5,
+            "lat": 25.4944,
+            "lon": 81.8651,
+            "bearing": 270,
+            "description": "Central Library entry area."
+        },
+        {
+            "id": "CSE_DEPT_ENTRY",
+            "type": "entrance_anchor",
+            "priority": "high",
+            "radius": 4,
+            "lat": 25.4931,
+            "lon": 81.8655,
+            "bearing": 0,
+            "description": "Computer Science Dept Entry sequence."
+        },
+        {
+            "id": "MAIN_ROAD_JUNCTION_1",
+            "type": "intersection",
+            "priority": "high",
+            "radius": 10,
+            "lat": 25.494630,
+            "lon": 81.864720,
+            "bearing": 135,
+            "description": "Critical routing decision point where Main Road splits to Admin and Academic."
+        },
+        {
+            "id": "ACAD_LIB_JUNCTION",
+            "type": "intersection",
+            "priority": "high",
+            "radius": 10,
+            "lat": 25.494677,
+            "lon": 81.864779,
+            "bearing": 45,
+            "description": "Y-junction splitting toward Library or Academic block."
+        },
+        {
+            "id": "CIVIL_MECH_CROSS",
+            "type": "intersection",
+            "priority": "high",
+            "radius": 10,
+            "lat": 25.4944,
+            "lon": 81.8645,
+            "bearing": 0,
+            "description": "Crossing path between Civil and Applied Mechanics."
+        },
+        {
+            "id": "ENG_SCIENCE_SPLIT",
+            "type": "intersection",
+            "priority": "high",
+            "radius": 10,
+            "lat": 25.4932,
+            "lon": 81.8665,
+            "bearing": 180,
+            "description": "Splits traffic between Engineering Block and Science Block."
+        },
+        {
+            "id": "ENG_MGMT_SPLIT",
+            "type": "intersection",
+            "priority": "high",
+            "radius": 10,
+            "lat": 25.4940,
+            "lon": 81.8650,
+            "bearing": 225,
+            "description": "Junction branching down to Management."
+        },
+        {
+            "id": "LONG_PATH_ACAD_1",
+            "type": "path_stabilizer",
+            "priority": "medium",
+            "radius": 15,
+            "lat": 25.494600,
+            "lon": 81.864400,
+            "bearing": 90,
+            "description": "Midpoint on long stretch to prevent cumulative drift."
+        },
+        {
+            "id": "LONG_PATH_LIB_1",
+            "type": "path_stabilizer",
+            "priority": "medium",
+            "radius": 15,
+            "lat": 25.494580,
+            "lon": 81.864900,
+            "bearing": 90,
+            "description": "Mid-path stabilizer approaching the Library."
+        },
+        {
+            "id": "LONG_PATH_ENG_1",
+            "type": "path_stabilizer",
+            "priority": "medium",
+            "radius": 15,
+            "lat": 25.492500,
+            "lon": 81.866200,
+            "bearing": 360,
+            "description": "Midpoint stabilizing drift on the long walk to Engineering."
+        },
+        {
+            "id": "CANTEEN_CROSSING",
+            "type": "intersection",
+            "priority": "high",
+            "radius": 8,
+            "lat": 25.4935,
+            "lon": 81.8658,
+            "bearing": 90,
+            "description": "High density pedestrian traffic area near central cafeteria."
+        },
+        {
+            "id": "HOSTEL_TRANSITION_GATE",
+            "type": "entrance_anchor",
+            "priority": "high",
+            "radius": 6,
+            "lat": 25.495127,
+            "lon": 81.864979,
+            "bearing": 180,
+            "description": "Entry point leading out to student hostels."
+        },
+        {
+            "id": "SPORTS_COMPLEX_ENTRY",
+            "type": "entrance_anchor",
+            "priority": "medium",
+            "radius": 8,
+            "lat": 25.491800,
+            "lon": 81.866000,
+            "bearing": 45,
+            "description": "Far south edge of the routing graph."
+        }
+    ]
+}

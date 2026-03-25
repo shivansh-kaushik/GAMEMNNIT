@@ -175,11 +175,19 @@ $$h(n) = \sqrt{(x_n - x_{goal})^2 + (z_n - z_{goal})^2}$$
 
 ---
 
-## 8. AR Navigation System
+## 8. AR Navigation System (Dual-Stage Localization)
 
-Projects directional overlays onto the live camera feed using **WebXR**.
+Projects directional overlays onto the live camera feed using **WebXR**. To overcome the severe limitations of consumer-grade mobile sensors (GPS drift, magnetometer interference), the system implements a robust **Constraint-Based Route-Matching Engine**.
 
-### 8.1 Confidence-Aware Visualization
+### 8.1 Dual-Stage Localization Pipeline
+Rather than implicitly trusting raw hardware sensors, the navigation pipeline enforces geographical correctness through two distinct constraint layers:
+
+1. **Level 1.5 Map Matching (Temporal & Directional Scoring):** 
+   Raw GPS coordinates are mathematically projected onto the defined A* route edges. An Edge Confidence Scoring function (evaluating distance, heading alignment, and path continuity) resolves ambiguous intersections. A Kalman-lite temporal filter applies Linear Interpolation to smooth coordinate corrections and prevent visual jumping.
+2. **Level 2 Absolute Correction (Physical Ground Truth):** 
+   Operating entirely within the browser via the native `BarcodeDetector` API, the system scans physical QR anchors arrayed at critical campus decision-points. Upon detection, the AR engine triggers a "Hard Reset", nullifying accumulated trajectory drift and cementing the user's coordinate frame to an absolute Ground Truth matrix.
+
+### 8.2 Confidence-Aware Visualization
 A key contribution is the **Confidence Cone** projection. When sensor uncertainty (GPS drift or magnetometer variance) exceeds $E_{max}$, the AR arrow morphs into an expanded cone, visually communicating ambiguity to the user to prevent over-reliance on inaccurate sensors.
 
 ### 8.2 Context-Aware Navigation Pipeline
