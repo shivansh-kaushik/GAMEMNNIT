@@ -309,7 +309,7 @@ export const AIAssistantPanel: React.FC<AIAssistantPanelProps> = ({
                     </form>
 
                     <div style={{ fontSize: '10px', color: '#475569', textAlign: 'center', marginTop: '4px' }}>
-                        Memory Enabled · Web Speech API · Live GPS · A* Route (Gemini 3.0)
+                        Memory Enabled · Web Speech API · Live GPS · A* Route (GPT-4o Mini)
                         <style>
                             {`
                             @keyframes typing-dot {
