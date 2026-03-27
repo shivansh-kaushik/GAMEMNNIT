@@ -9,6 +9,8 @@ import { useNavigationConfidence } from '../hooks/useNavigationConfidence';
 import { useVoiceGuidance } from '../hooks/useVoiceGuidance';
 import { MiniMapOverlay } from '../components/MiniMapOverlay';
 import { FloorIndicator } from '../components/FloorIndicator';
+import { calibrateFloor } from '../sensors/floorDetection';
+
 
 
 import { MapView } from '../components/MapView';
@@ -253,6 +255,9 @@ export const ARPage: React.FC = () => {
 
         const msg = new SpeechSynthesisUtterance('Ground truth established.');
         window.speechSynthesis.speak(msg);
+
+        // STABILIZATION: Reset floor baseline on QR scan (assuming current floor is G/0 if not specified)
+        calibrateFloor(0);
     }, [sensors]);
 
     // Note: Passive background scanning (markerScannerRef) is intentionally REMOVED.
@@ -651,7 +656,10 @@ export const ARPage: React.FC = () => {
                 sensors + waypoints passed so voice guidance loop can read live state.
                 All existing AR logic above remains completely unchanged.            */}
             <AIAssistantPanel
-                onNavigate={(id) => setDestId(id)}
+                onNavigate={(id) => {
+                    setDestId(id);
+                    // STABILIZATION: Optional - trigger a reset when starting a new navigation if needed
+                }}
                 arActive={arActive}
                 sensors={sensors}
                 waypoints={waypoints}

@@ -101,6 +101,13 @@ object WifiFingerprints {
     }
 
     /**
+     * Helper to check if a scanned BSSID is in our database.
+     */
+    fun isKnown(bssid: String): Boolean {
+        return database.values.any { list -> list.any { it.bssid == bssid } }
+    }
+
+    /**
      * Euclidean distance between current scan and a fingerprint.
      * Only considers BSSID entries that appear in both the fingerprint and the scan.
      */

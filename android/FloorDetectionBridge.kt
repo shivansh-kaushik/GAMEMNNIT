@@ -13,25 +13,10 @@ import org.json.JSONObject
 import java.util.LinkedList
 
 /**
- * FloorDetectionBridge.kt
+ * FloorDetectionBridge.kt — STABILIZED VERSION
  *
  * Hybrid vertical localization: Barometer (primary) + WiFi fingerprinting (correction).
- * Sends floor data to the WebView via window.updateFloor() every ~500ms.
- *
- * USAGE (in your Activity or Fragment):
- *
- *   private lateinit var floorBridge: FloorDetectionBridge
- *
- *   override fun onCreate(...) {
- *       ...
- *       floorBridge = FloorDetectionBridge(this, webView)
- *       floorBridge.start()
- *   }
- *
- *   override fun onDestroy() {
- *       floorBridge.stop()
- *       super.onDestroy()
- *   }
+ * Implements Hysteresis, WiFi Stability Gates, and confirmation cycles.
  */
 class FloorDetectionBridge(
     private val context: Context,
@@ -39,12 +24,15 @@ class FloorDetectionBridge(
 ) : SensorEventListener {
 
     // ─── Configuration ──────────────────────────────────────────────
-    private val PRESSURE_WINDOW_SIZE    = 7        // Moving average window
+    private val PRESSURE_WINDOW_SIZE    = 10       // Larger window for better smoothing
     private val FLOOR_HEIGHT_METERS     = 3.2      // Average floor height
-    private val SEA_LEVEL_PRESSURE      = 1013.25f // hPa reference
-    private val WIFI_SCAN_INTERVAL_MS   = 3000L    // Scan every 3 seconds
-    private val BRIDGE_UPDATE_MS        = 500L     // Push to WebView every 500ms
-    private val WIFI_CONFIDENCE_GATE    = 0.70     // Min confidence to use WiFi
+    private val HYSTERESIS_THRESHOLD    = 2.5      // Meters required to flip floor
+    private val CONFIRMATION_CYCLES     = 3        // Required consecutive readings
+    private val SEA_LEVEL_PRESSURE      = 1013.25f
+    private val WIFI_SCAN_INTERVAL_MS   = 3000L
+    private val BRIDGE_UPDATE_MS        = 500L
+    private val WIFI_CONFIDENCE_GATE    = 0.75     // Stricter gate
+    private val MIN_VISIBLE_BSSIDS      = 3        // More APs for stability
 
     // ─── State ──────────────────────────────────────────────────────
     private val pressureWindow = LinkedList<Float>()
@@ -52,6 +40,12 @@ class FloorDetectionBridge(
     private var currentFloor: Int = 0
     private var floorSource: String = "unknown"
     private var floorConfidence: Double = 0.0
+
+    // Stabilization State
+    private var pendingFloor: Int = 0
+    private var confirmationCount: Int = 0
+    private var lastWifiFloor: Int = -1
+    private var wifiStabilityCount: Int = 0
 
     // ─── Android APIs ────────────────────────────────────────────────
     private val sensorManager by lazy {
@@ -62,7 +56,6 @@ class FloorDetectionBridge(
     }
     private val mainHandler = Handler(Looper.getMainLooper())
 
-    // ─── Runnables ───────────────────────────────────────────────────
     private val wifiScanRunnable = object : Runnable {
         override fun run() {
             performWifiScan()
@@ -77,25 +70,15 @@ class FloorDetectionBridge(
         }
     }
 
-    // ────────────────────────────────────────────────────────────────
-    // Public API
-    // ────────────────────────────────────────────────────────────────
-
-    /** Start listening to sensors. Call from Activity.onResume() or onCreate(). */
     fun start() {
         val pressureSensor = sensorManager.getDefaultSensor(Sensor.TYPE_PRESSURE)
         if (pressureSensor != null) {
             sensorManager.registerListener(this, pressureSensor, SensorManager.SENSOR_DELAY_NORMAL)
-        } else {
-            android.util.Log.w("FloorDetection", "No barometric pressure sensor found.")
-            floorSource = "wifi" // Prefer WiFi if no barometer
         }
-
         mainHandler.post(wifiScanRunnable)
         mainHandler.post(bridgeUpdateRunnable)
     }
 
-    /** Stop all sensors and timers. Call from Activity.onDestroy() or onPause(). */
     fun stop() {
         sensorManager.unregisterListener(this)
         mainHandler.removeCallbacks(wifiScanRunnable)
@@ -103,117 +86,118 @@ class FloorDetectionBridge(
     }
 
     /**
-     * Calibrate the baseline altitude to a user-selected floor.
-     * Call this after the user picks their current floor in the web UI.
-     * @param userFloor Floor number (0 = Ground, 1 = First, etc.)
+     * Calibration Reset — Triggered by QR scans or Building entry.
+     * Re-anchors baselineAltitude to prevent barometric drift.
      */
     fun calibrate(userFloor: Int) {
-        val avgPressure = if (pressureWindow.isNotEmpty())
-            pressureWindow.average().toFloat()
-            else SEA_LEVEL_PRESSURE
-
-        val rawAltitude = pressureToAltitude(avgPressure)
-        baselineAltitude = rawAltitude - (userFloor * FLOOR_HEIGHT_METERS)
+        if (pressureWindow.isEmpty()) return
+        val altitude = pressureToAltitude(pressureWindow.average().toFloat())
+        baselineAltitude = altitude - (userFloor * FLOOR_HEIGHT_METERS)
         currentFloor = userFloor
-        android.util.Log.i("FloorDetection", "Calibrated: baseline=${baselineAltitude}m floor=$userFloor")
+        pendingFloor = userFloor
+        confirmationCount = 0
+        android.util.Log.i("FloorDetection", "RE-CALIBRATED: floor=$userFloor baseline=${baselineAltitude}m")
     }
 
     // ────────────────────────────────────────────────────────────────
-    // Barometer — SensorEventListener
+    // Barometer — Hysteresis & Confirmation
     // ────────────────────────────────────────────────────────────────
 
     override fun onSensorChanged(event: SensorEvent) {
         if (event.sensor.type != Sensor.TYPE_PRESSURE) return
-
         val pressure = event.values[0]
 
-        // Spike rejection: ignore values > 50 hPa away from current average
-        if (pressureWindow.size >= 2) {
-            val currentAvg = pressureWindow.average()
-            if (Math.abs(pressure - currentAvg) > 50) return
-        }
+        // Noise/Spike Filtering
+        if (pressureWindow.size >= 2 && Math.abs(pressure - pressureWindow.average()) > 30) return
 
-        // Maintain sliding window
         pressureWindow.addLast(pressure)
         if (pressureWindow.size > PRESSURE_WINDOW_SIZE) pressureWindow.removeFirst()
 
-        // Only update barometer floor estimate if WiFi is not dominant
-        if (floorSource != "wifi" || floorConfidence < WIFI_CONFIDENCE_GATE) {
-            updateBarometerFloor()
-        }
+        updateHystereticFloor()
     }
 
     override fun onAccuracyChanged(sensor: Sensor, accuracy: Int) {}
 
-    private fun updateBarometerFloor() {
-        if (pressureWindow.isEmpty()) return
+    private fun updateHystereticFloor() {
+        if (pressureWindow.isEmpty() || (floorSource == "wifi" && floorConfidence >= WIFI_CONFIDENCE_GATE)) return
 
-        val avgPressure = pressureWindow.average().toFloat()
-        val altitude    = pressureToAltitude(avgPressure)
+        val altitude = pressureToAltitude(pressureWindow.average().toFloat())
         val relAltitude = altitude - baselineAltitude
-        val baroFloor   = Math.round(relAltitude / FLOOR_HEIGHT_METERS).toInt()
-
-        // Clamp to sane range [0, 10]
-        currentFloor   = baroFloor.coerceIn(0, 10)
-        floorSource    = "barometer"
-        floorConfidence = 0.6 // Barometer medium confidence
+        
+        // Target calculation based on threshold
+        val targetFloor = Math.round(relAltitude / FLOOR_HEIGHT_METERS).toInt().coerceIn(0, 10)
+        
+        // Hysteresis: Only change if distance is significant
+        val distFromCurrent = Math.abs(relAltitude - (currentFloor * FLOOR_HEIGHT_METERS))
+        
+        if (targetFloor != currentFloor && distFromCurrent > HYSTERESIS_THRESHOLD) {
+            if (targetFloor == pendingFloor) {
+                confirmationCount++
+                if (confirmationCount >= CONFIRMATION_CYCLES) {
+                    currentFloor = targetFloor
+                    floorSource = "barometer"
+                    floorConfidence = 0.6
+                }
+            } else {
+                pendingFloor = targetFloor
+                confirmationCount = 1
+            }
+        } else {
+            confirmationCount = 0
+        }
     }
 
-    private fun pressureToAltitude(pressure: Float): Double {
-        return 44330.0 * (1.0 - Math.pow((pressure / SEA_LEVEL_PRESSURE).toDouble(), 1.0 / 5.255))
-    }
+    private fun pressureToAltitude(p: Float): Double = 
+        44330.0 * (1.0 - Math.pow((p / SEA_LEVEL_PRESSURE).toDouble(), 1.0 / 5.255))
 
     // ────────────────────────────────────────────────────────────────
-    // WiFi Fingerprinting
+    // WiFi — Stability Gate
     // ────────────────────────────────────────────────────────────────
 
     private fun performWifiScan() {
         try {
             @Suppress("DEPRECATION")
-            val success = wifiManager.startScan()
-            if (!success) return
-
-            // Small delay to let scan complete
+            wifiManager.startScan()
             mainHandler.postDelayed({
                 @Suppress("DEPRECATION")
-                val results = wifiManager.scanResults
-                if (results.isNullOrEmpty()) return@postDelayed
-
-                // Build current scan map: BSSID → RSSI
+                val results = wifiManager.scanResults ?: return@postDelayed
                 val currentScan = results.associate { it.BSSID to it.level }
 
-                // Match against fingerprint database
+                // Match with stability requirements
                 val (wifiFloor, wifiConfidence) = WifiFingerprints.matchFloor(currentScan)
+                
+                // Count visible known APs (from DB)
+                val visibleKnown = results.count { res -> WifiFingerprints.isKnown(res.BSSID) }
 
-                // Fusion: WiFi wins if confidence is high enough
-                if (wifiConfidence >= WIFI_CONFIDENCE_GATE) {
-                    currentFloor    = wifiFloor
-                    floorSource     = "wifi"
-                    floorConfidence = wifiConfidence
+                if (visibleKnown >= MIN_VISIBLE_BSSIDS && wifiConfidence >= WIFI_CONFIDENCE_GATE) {
+                    if (wifiFloor == lastWifiFloor) {
+                        wifiStabilityCount++
+                        if (wifiStabilityCount >= 2) { // Stable for 2 scans
+                            currentFloor = wifiFloor
+                            floorSource = "wifi"
+                            floorConfidence = wifiConfidence
+                            // Also adjust barometer baseline to match WiFi's truth
+                            val alt = pressureToAltitude(pressureWindow.average().toFloat())
+                            baselineAltitude = alt - (currentFloor * FLOOR_HEIGHT_METERS)
+                        }
+                    } else {
+                        lastWifiFloor = wifiFloor
+                        wifiStabilityCount = 1
+                    }
+                } else {
+                    wifiStabilityCount = 0
+                    if (floorSource == "wifi") floorSource = "barometer" // Fallback
                 }
-                // Else keep the barometer estimate
-
             }, 1500)
-        } catch (e: SecurityException) {
-            android.util.Log.w("FloorDetection", "WiFi scan denied — missing location permission.")
-        }
+        } catch (e: SecurityException) {}
     }
-
-    // ────────────────────────────────────────────────────────────────
-    // WebView Bridge
-    // ────────────────────────────────────────────────────────────────
 
     private fun pushToWebView() {
         val payload = JSONObject().apply {
-            put("floor",      currentFloor)
-            put("source",     floorSource)
+            put("floor", currentFloor)
+            put("source", floorSource)
             put("confidence", floorConfidence)
         }
-
-        val js = "if(window.updateFloor){window.updateFloor(${payload});}"
-
-        webView.post {
-            webView.evaluateJavascript(js, null)
-        }
+        webView.post { webView.evaluateJavascript("if(window.updateFloor){window.updateFloor($payload);}", null) }
     }
 }

@@ -5,6 +5,8 @@ import { startListening, stopListening, speak, isSpeechAvailable } from './voice
 import { startVoiceGuidance } from './voiceGuidance';
 import { ARNavWaypoint } from '../ar/arNavigation';
 import { ARSensors } from '../ar/arEngine';
+import { calibrateFloor } from '../sensors/floorDetection';
+
 
 /**
  * AIAssistantPanel — Floating AI assistant layered on top of the AR view.
@@ -81,6 +83,9 @@ export const AIAssistantPanel: React.FC<AIAssistantPanelProps> = ({
                     setStatus('done');
                     guidanceSession.current?.stop();
                     guidanceSession.current = null;
+                    
+                    // STABILIZATION: Reset floor baseline on arrival at building entrance
+                    calibrateFloor(0);
                 }
             }
         );
