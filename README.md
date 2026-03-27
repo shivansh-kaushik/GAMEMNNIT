@@ -56,7 +56,18 @@ Empirical evaluation (N=30 trials) demonstrates a significant reduction in navig
 
 ---
 
-## 📸 Screenshots
+## 📋 Changelog
+
+### March 2026 — v1.3 (Latest)
+| Change | Detail |
+|---|---|
+| **AR Road-Following Fixed** | `buildARPath` now uses A* over `mnnit_paths.json` instead of straight-line interpolation. AR arrows follow real campus roads. |
+| **Mobile UI Scaling** | AR tab overlays (diagnostics, nav state, buttons) are now scaled down and repositioned on mobile (`isMobile` detection). |
+| **Scrollable AR Modal** | The destination confirmation modal (map preview + confirm button) is now scrollable, so buttons are always reachable on small screens. |
+| **UI Zoom Fix** | Reverted global `zoom:0.5` that broke map layout; switched to surgical per-overlay scaling (80–85%) for clean fit. |
+
+---
+
 
 <p align="center">
   <img src="docs/screenshot_twin.png" width="30%" alt="3D Digital Twin" />
@@ -199,8 +210,15 @@ Rather than implicitly trusting raw hardware sensors, the navigation pipeline en
 ### 8.2 Confidence-Aware Visualization
 A key contribution is the **Confidence Cone** projection. When sensor uncertainty (GPS drift or magnetometer variance) exceeds $E_{max}$, the AR arrow morphs into an expanded cone, visually communicating ambiguity to the user to prevent over-reliance on inaccurate sensors.
 
-### 8.2 Context-Aware Navigation Pipeline
-The final AR implementation transitions from basic point-to-point visualization to a **closed-loop navigation system**. Functional capabilities include:
+### 8.3 Context-Aware Navigation Pipeline *(Updated v1.3)*
+The final AR implementation transitions from basic point-to-point visualization to a **closed-loop, road-following navigation system**. As of v1.3, **the AR arrows follow the actual campus road graph** — the same A* graph used by the Digital Twin and Real Map tabs. The pipeline:
+
+1. **GPS → Road Snap:** Live GPS position is snapped to the nearest node in `mnnit_paths.json`.
+2. **A\* Routing:** Optimal road-following path is computed from start node to destination node.
+3. **GPS Waypoints:** Graph node GPS coordinates feed the AR arrow sequence (no straight-line interpolation).
+4. **Progressive Guidance:** Arrow re-orients at each waypoint toward the next road segment.
+
+Functional capabilities also include:
 -   **Dynamic Waypoint Tracking:** AR arrows strictly align with the local bearing of the *immediate next* A* segment, ensuring realistic turn handling over simple line-of-sight tracking.
 -   **Entrance Proximity Detection:** Geospatial bounding boxes ($d < 10m$) automatically trigger structural entrance notifications for key nodes.
 -   **Path Deviation Protection:** Continuous monitoring calculates user divergence from the active route trace, deploying $\Delta_{error} > 8m$ warnings to prevent wrong movement.
