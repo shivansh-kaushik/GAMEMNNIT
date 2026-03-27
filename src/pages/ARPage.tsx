@@ -39,6 +39,7 @@ function getDistanceM(lat1: number, lon1: number, lat2: number, lon2: number) {
  * This is a completely self-contained module – it does not modify any other page.
  */
 export const ARPage: React.FC = () => {
+    const isMobile = window.innerWidth < 768;
     const videoRef = useRef<HTMLVideoElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const animRef = useRef<number | null>(null);
@@ -444,7 +445,7 @@ export const ARPage: React.FC = () => {
             )}
 
             {/* Top Controls */}
-            <div style={{ position: 'absolute', top: '20px', left: '50%', transform: 'translateX(-50%)', zIndex: 10, display: 'flex', gap: '12px', alignItems: 'center' }}>
+            <div style={{ position: 'absolute', top: isMobile ? '10px' : '20px', left: '50%', transform: 'translateX(-50%)', zIndex: 10, display: 'flex', gap: isMobile ? '6px' : '12px', alignItems: 'center', zoom: isMobile ? 0.8 : 1 }}>
                 {!arActive ? (
                     <button onClick={startCamera} style={btnStyle('#00ff88', '#000')}>
                         📷 Start AR Navigation
@@ -457,7 +458,7 @@ export const ARPage: React.FC = () => {
                         ) : (
                             <button onClick={stopLogging} style={btnStyle('#f59e0b', '#fff')}>🟠 Stop Log</button>
                         )}
-                        <button onClick={downloadLogs} style={btnStyle('#8b5cf6', '#fff')}>⬇ Download</button>
+                        {!isMobile && <button onClick={downloadLogs} style={btnStyle('#8b5cf6', '#fff')}>⬇ Download</button>}
                     </>
                 )}
             </div>
@@ -558,19 +559,19 @@ export const ARPage: React.FC = () => {
 
             {/* Smart Navigation Overlays */}
             {arActive && (
-                <div style={{ position: 'absolute', top: '25%', left: '50%', transform: 'translateX(-50%)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', zIndex: 11 }}>
+                <div style={{ position: 'absolute', top: '25%', left: '50%', transform: 'translateX(-50%)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', zIndex: 11, zoom: isMobile ? 0.75 : 1 }}>
                     {turnMessage && (
-                        <div style={{ background: 'rgba(59, 130, 246, 0.9)', color: '#fff', padding: '12px 24px', borderRadius: '30px', fontWeight: 'bold', fontSize: '18px', boxShadow: '0 4px 15px rgba(0,0,0,0.5)', border: '2px solid rgba(255,255,255,0.7)' }}>
+                        <div style={{ background: 'rgba(59, 130, 246, 0.9)', color: '#fff', padding: isMobile ? '8px 16px' : '12px 24px', borderRadius: '30px', fontWeight: 'bold', fontSize: isMobile ? '14px' : '18px', boxShadow: '0 4px 15px rgba(0,0,0,0.5)', border: '2px solid rgba(255,255,255,0.7)' }}>
                             {turnMessage}
                         </div>
                     )}
                     {entranceWarning && (
-                        <div style={{ background: 'rgba(16, 185, 129, 0.9)', color: '#fff', padding: '10px 20px', borderRadius: '12px', fontWeight: 'bold', fontSize: '16px', border: '2px solid rgba(255,255,255,0.5)' }}>
+                        <div style={{ background: 'rgba(16, 185, 129, 0.9)', color: '#fff', padding: isMobile ? '6px 12px' : '10px 20px', borderRadius: '12px', fontWeight: 'bold', fontSize: isMobile ? '12px' : '16px', border: '2px solid rgba(255,255,255,0.5)' }}>
                             {entranceWarning}
                         </div>
                     )}
                     {pathWarning && (
-                        <div style={{ background: 'rgba(239, 68, 68, 0.9)', color: '#fff', padding: '10px 20px', borderRadius: '12px', fontWeight: 'bold', fontSize: '16px', border: '2px solid rgba(255,255,255,0.5)', animation: 'pulse 1s infinite' }}>
+                        <div style={{ background: 'rgba(239, 68, 68, 0.9)', color: '#fff', padding: isMobile ? '6px 12px' : '10px 20px', borderRadius: '12px', fontWeight: 'bold', fontSize: isMobile ? '12px' : '16px', border: '2px solid rgba(255,255,255,0.5)', animation: 'pulse 1s infinite' }}>
                             {pathWarning}
                         </div>
                     )}
@@ -579,9 +580,9 @@ export const ARPage: React.FC = () => {
 
             {/* Live Location & Dev Debug */}
             {arActive && sensors && sensors.gpsLat !== null && (
-                <div style={{ position: 'absolute', bottom: '70px', left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: '8px', zIndex: 10 }}>
-                    <div style={{ background: 'rgba(0,0,0,0.6)', color: '#00ff88', padding: '6px 12px', borderRadius: '12px', fontSize: '11px', fontWeight: 'bold', border: '1px solid #00ff8833' }}>
-                        📍 {sensors.gpsLat.toFixed(5)}°N, {sensors.gpsLon.toFixed(5)}°E
+                <div style={{ position: 'absolute', bottom: isMobile ? '55px' : '70px', left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: '6px', zIndex: 10, zoom: isMobile ? 0.8 : 1, flexWrap: 'wrap', justifyContent: 'center', width: '90%' }}>
+                    <div style={{ background: 'rgba(0,0,0,0.6)', color: '#00ff88', padding: '6px 10px', borderRadius: '12px', fontSize: isMobile ? '10px' : '11px', fontWeight: 'bold', border: '1px solid #00ff8833' }}>
+                        📍 {sensors.gpsLat.toFixed(4)}°N, {sensors.gpsLon.toFixed(4)}°E
                     </div>
                     {destId && !gtAnchorUI.active && (
                         <div style={{ background: snapUI.isLocked ? 'rgba(16, 185, 129, 0.9)' : 'rgba(245, 158, 11, 0.9)', color: '#fff', padding: '6px 12px', borderRadius: '12px', fontSize: '11px', fontWeight: 'bold', border: '1px solid rgba(255,255,255,0.4)', transition: 'background 0.3s' }}>
@@ -615,9 +616,9 @@ export const ARPage: React.FC = () => {
 
             {/* Diagnostic Panel for Defense / Viva */}
             {arActive && (
-                <div style={{ position: 'absolute', top: '90px', left: '16px', background: 'rgba(0,0,0,0.7)', border: '1px solid #444', borderRadius: '8px', padding: '12px', color: '#fff', fontSize: '12px', zIndex: 20, fontFamily: 'monospace' }}>
-                    <div style={{ color: '#aaa', marginBottom: '6px', fontWeight: 'bold', textTransform: 'uppercase' }}>Diagnostics</div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '80px 1fr', gap: '4px' }}>
+                <div style={{ position: 'absolute', top: isMobile ? '55px' : '90px', left: isMobile ? '8px' : '16px', background: 'rgba(0,0,0,0.7)', border: '1px solid #444', borderRadius: '8px', padding: isMobile ? '6px 8px' : '12px', color: '#fff', fontSize: isMobile ? '10px' : '12px', zIndex: 20, fontFamily: 'monospace', zoom: isMobile ? 0.85 : 1 }}>
+                    <div style={{ color: '#aaa', marginBottom: '4px', fontWeight: 'bold', textTransform: 'uppercase' }}>Diagnostics</div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '70px 1fr', gap: '3px' }}>
                         <span style={{ color: '#888' }}>Error:</span>
                         <span style={{ color: '#ef4444' }}>{debugInfo.error.toFixed(1)} m</span>
                         <span style={{ color: '#888' }}>Deviation:</span>
@@ -630,15 +631,15 @@ export const ARPage: React.FC = () => {
 
             {/* Live Navigation State (Explainable AI / Navigation Layer) */}
             {arActive && destId && waypoints.length > 0 && (
-                <div style={{ position: 'absolute', top: '150px', left: '16px', background: 'rgba(0,0,0,0.85)', border: '1px solid rgba(0, 255, 136, 0.4)', borderRadius: '10px', padding: '12px', color: '#fff', fontSize: '13px', zIndex: 20, fontFamily: 'Inter, sans-serif', boxShadow: '0 4px 15px rgba(0,0,0,0.6)', backdropFilter: 'blur(5px)' }}>
-                    <div style={{ color: '#00ff88', marginBottom: '8px', fontWeight: 'bold', textTransform: 'uppercase', fontSize: '11px', letterSpacing: '1px' }}>Navigation State</div>
-                    <div style={{ marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#00ff88', animation: 'pulse 1.5s infinite' }} />
+                <div style={{ position: 'absolute', top: isMobile ? '130px' : '150px', left: isMobile ? '8px' : '16px', background: 'rgba(0,0,0,0.85)', border: '1px solid rgba(0, 255, 136, 0.4)', borderRadius: '10px', padding: isMobile ? '8px' : '12px', color: '#fff', fontSize: isMobile ? '11px' : '13px', zIndex: 20, fontFamily: 'Inter, sans-serif', boxShadow: '0 4px 15px rgba(0,0,0,0.6)', backdropFilter: 'blur(5px)', zoom: isMobile ? 0.85 : 1 }}>
+                    <div style={{ color: '#00ff88', marginBottom: '6px', fontWeight: 'bold', textTransform: 'uppercase', fontSize: isMobile ? '9px' : '11px', letterSpacing: '1px' }}>Navigation State</div>
+                    <div style={{ marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                        <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#00ff88', animation: 'pulse 1.5s infinite' }} />
                         <span>Moving toward <strong>Node {waypoints.length > 1 ? waypoints.length - 1 : 'Destination'}</strong></span>
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px', background: 'rgba(255,255,255,0.05)', padding: '6px 8px', borderRadius: '6px' }}>
-                        <span style={{ color: '#aaa', fontSize: '12px' }}>Nodes Remaining:</span>
-                        <span style={{ fontWeight: 'bold', fontSize: '14px', color: '#fff' }}>{waypoints.length}</span>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', background: 'rgba(255,255,255,0.05)', padding: '4px 8px', borderRadius: '6px' }}>
+                        <span style={{ color: '#aaa', fontSize: isMobile ? '10px' : '12px' }}>Nodes Remaining:</span>
+                        <span style={{ fontWeight: 'bold', fontSize: isMobile ? '12px' : '14px', color: '#fff' }}>{waypoints.length}</span>
                     </div>
                 </div>
             )}
