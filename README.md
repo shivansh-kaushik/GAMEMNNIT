@@ -65,6 +65,7 @@ Empirical evaluation (N=30 trials) demonstrates a significant reduction in navig
 | **Mobile UI Scaling** | AR tab overlays (diagnostics, nav state, buttons) are now scaled down and repositioned on mobile (`isMobile` detection). |
 | **Scrollable AR Modal** | The destination confirmation modal (map preview + confirm button) is now scrollable, so buttons are always reachable on small screens. |
 | **UI Zoom Fix** | Reverted global `zoom:0.5` that broke map layout; switched to surgical per-overlay scaling (80–85%) for clean fit. |
+| **Hybrid Floor Detection** | Added Android native bridge for vertical (Z) localization using barometric pressure + WiFi fingerprinting. |
 
 ---
 
@@ -224,6 +225,13 @@ Functional capabilities also include:
 -   **Path Deviation Protection:** Continuous monitoring calculates user divergence from the active route trace, deploying $\Delta_{error} > 8m$ warnings to prevent wrong movement.
 -   **Orientation-Based Guidance:** Normalizing Haversine trajectory bearings against live device gyroscope matrices provides immediate spatial directives (`Turn Left` / `Turn Right`).
 -   **Telemetry Validation Logging:** A heads-up evaluation panel actively streams `Error`, `Deviation`, and `DistanceToTarget` metrics directly to the underlying client-side logger.
+
+### 8.4 Hybrid Vertical Localization (Floor Detection)
+To extend the system from 2D routing to 3D spatial awareness, a **Hybrid Vertical Localization** engine was implemented via an Android WebView bridge:
+- **Barometric Altimetry (Primary):** Continuous altitude estimation using `Sensor.TYPE_PRESSURE`, converted to floor levels via a moving-average filter and iterative baseline calibration.
+- **WiFi Fingerprinting (Correction):** Discrete floor verification using Euclidean distance matching against a predefined BSSID/RSSI database (`WifiFingerprints.kt`).
+- **Sensor Fusion:** WiFi results override the barometer when confidence > 0.7, ensuring drift correction during long vertical transitions.
+- **UI Overlay:** A dedicated `FloorIndicator` component displays the current floor, source (🌡 Barometer / 📶 WiFi), and real-time confidence scores.
 
 ### 8.3 Interpretability & Explainable AI Visualization
 To bridge the "Explainability Gap" and demonstrate real-time algorithm execution distinct from traditional 2D navigation systems (e.g. Google Maps), a dedicated **Interpretability Layer** was engineered directly into the pipeline:

@@ -8,6 +8,8 @@ import { useHeadingSmoothing } from '../hooks/useHeadingSmoothing';
 import { useNavigationConfidence } from '../hooks/useNavigationConfidence';
 import { useVoiceGuidance } from '../hooks/useVoiceGuidance';
 import { MiniMapOverlay } from '../components/MiniMapOverlay';
+import { FloorIndicator } from '../components/FloorIndicator';
+
 
 import { MapView } from '../components/MapView';
 import { ComparisonPanel } from '../components/ComparisonPanel';
@@ -654,6 +656,9 @@ export const ARPage: React.FC = () => {
                 sensors={sensors}
                 waypoints={waypoints}
             />
+
+            {/* Hybrid Vertical Localization (purely additive overlay) */}
+            <FloorIndicator skipCalibration={!arActive} />
         </div>
     );
 };
