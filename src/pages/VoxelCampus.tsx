@@ -420,7 +420,7 @@ export const VoxelCampus: React.FC<VoxelCampusProps> = ({ selectedBuildingId, on
             </Canvas>
 
             {/* Destination Selector UI */}
-            < div style={{ position: 'absolute', top: isMobile ? '10px' : '20px', right: isMobile ? '10px' : '20px', zIndex: 3001 }}>
+            < div style={{ position: 'absolute', top: isMobile ? '10px' : '20px', right: isMobile ? '10px' : '20px', zIndex: 3001, zoom: 0.85 }}>
                 <div style={{ background: 'rgba(0,0,0,0.8)', padding: '15px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.2)', backdropFilter: 'blur(10px)', width: isMobile ? '160px' : '220px' }}>
                     <label style={{ fontSize: '9px', color: '#888', display: 'block', marginBottom: '8px', letterSpacing: '1.5px' }}>SELECT DESTINATION</label>
                     <select
@@ -437,7 +437,7 @@ export const VoxelCampus: React.FC<VoxelCampusProps> = ({ selectedBuildingId, on
             </div >
 
             {/* UI Overlays */}
-            < div style={{ position: 'absolute', top: isMobile ? '10px' : '20px', left: isMobile ? '10px' : '20px', color: 'white', fontFamily: 'monospace', pointerEvents: 'none', width: isMobile ? '140px' : '300px', zIndex: 3000, display: 'flex', flexDirection: 'column', gap: isMobile ? '4px' : '10px' }}>
+            < div style={{ position: 'absolute', top: isMobile ? '10px' : '20px', left: isMobile ? '10px' : '20px', color: 'white', fontFamily: 'monospace', pointerEvents: 'none', width: isMobile ? '140px' : '300px', zIndex: 3000, display: 'flex', flexDirection: 'column', gap: isMobile ? '4px' : '10px', zoom: 0.85 }}>
                 <h1 style={{ margin: 0, fontSize: isMobile ? '12px' : '18px', letterSpacing: '2px', textShadow: '0 0 10px #00ff88' }}>🏛 MNNIT TWIN</h1>
 
                 {onTransportModeChange && (

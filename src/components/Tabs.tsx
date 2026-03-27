@@ -29,7 +29,8 @@ export const Tabs: React.FC<TabsProps> = ({ activeTab, onTabChange }) => {
             position: 'absolute',
             bottom: isMobile ? '10px' : '20px',
             left: '50%',
-            transform: 'translateX(-50%)',
+            transform: 'translateX(-50%) scale(0.8)', // Scaled down for better fit
+            transformOrigin: 'bottom center',
             display: 'flex',
             gap: isMobile ? '5px' : '10px',
             background: 'rgba(0,0,0,0.85)',
@@ -39,7 +40,7 @@ export const Tabs: React.FC<TabsProps> = ({ activeTab, onTabChange }) => {
             backdropFilter: 'blur(15px)',
             zIndex: 3000,
             boxShadow: '0 10px 30px rgba(0,0,0,0.5)',
-            width: isMobile ? '95vw' : 'auto',
+            width: isMobile ? '90vw' : 'auto',
             justifyContent: 'center',
             overflowX: 'auto',
             scrollbarWidth: 'none'

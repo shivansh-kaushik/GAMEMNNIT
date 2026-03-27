@@ -304,7 +304,7 @@ export const RealMap: React.FC<RealMapProps> = ({ selectedBuildingId, onSelectBu
             </Map>
 
             {/* UI Overlays */}
-            <div style={{ position: 'absolute', top: '20px', left: '20px', zIndex: 1000, pointerEvents: 'none', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <div style={{ position: 'absolute', top: '20px', left: '20px', zIndex: 1000, pointerEvents: 'none', display: 'flex', flexDirection: 'column', gap: '10px', zoom: 0.8 }}>
                 <div style={{ background: 'rgba(0,0,0,0.8)', padding: '15px', borderRadius: '8px', border: '1px solid #00ff88', backdropFilter: 'blur(10px)', pointerEvents: 'auto' }}>
                     <h2 style={{ color: '#00ff88', margin: '0 0 5px 0', fontSize: '14px', letterSpacing: '1px' }}>🗺 AUTO-GENERATED TWIN</h2>
                     <p style={{ color: '#aaa', margin: 0, fontSize: '11px' }}>OSM + Mapbox GL Extrusion</p>
@@ -341,7 +341,7 @@ export const RealMap: React.FC<RealMapProps> = ({ selectedBuildingId, onSelectBu
             </div>
 
             {/* Navigation Dropdown (Top Right) */}
-            <div style={{ position: 'absolute', top: '20px', right: '20px', zIndex: 1000 }}>
+            <div style={{ position: 'absolute', top: '20px', right: '20px', zIndex: 1000, zoom: 0.8 }}>
                 <div style={{ background: 'rgba(0,0,0,0.8)', padding: '15px', borderRadius: '8px', border: '1px solid #333', minWidth: '220px' }}>
                     <div style={{ color: '#aaa', fontSize: '10px', marginBottom: '8px', textTransform: 'uppercase' }}>Select Destination</div>
                     <select
