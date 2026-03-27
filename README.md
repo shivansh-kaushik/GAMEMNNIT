@@ -103,6 +103,8 @@ graph TD
 ```
 *User → Intent → A* → Localization (DSLS) → AR Rendering*
 
+This pipeline enforces a strict separation between perception (sensors), reasoning (A*), and visualization (AR), ensuring modularity and robustness.
+
 #### Components
 - **UI** → React + WebXR  
 - **LLM** → Intent parsing only  
@@ -309,6 +311,7 @@ NOT used for:
 
 ---
 
+The following sections provide a detailed academic and implementation-level expansion of the system summarized above.
 
 <p align="center">
   <img src="docs/screenshot_twin.png" width="30%" alt="3D Digital Twin" />
@@ -375,7 +378,7 @@ Early work by **Azuma (1997)** established AR foundations, but modern advancemen
 
 ---
 
-## 3. System Architecture
+## 4. System Architecture
 
 The system follows a **modular, decoupled architecture** separating visualization (Three.js), routing (A*), and AI inference (Gemini).
 
@@ -435,6 +438,8 @@ $$h(n) = \sqrt{(x_n - x_{goal})^2 + (z_n - z_{goal})^2}$$
 
 ---
 
+## 8. AR Navigation System
+
 Projects directional overlays onto the live camera feed using **WebXR**. To overcome the severe limitations of consumer-grade mobile sensors (GPS drift, magnetometer interference), the system implements a **Dual-Stage Localization System** (DSLS).
 
 > [!NOTE]
@@ -443,10 +448,11 @@ Projects directional overlays onto the live camera feed using **WebXR**. To over
 ### 8.1 Dual-Stage Localization Pipeline (DSLS)
 Rather than implicitly trusting raw hardware sensors, the navigation pipeline enforces geographical correctness through two distinct recalibration layers:
 
-1.  **Level 1.5 Map Matching (Temporal & Directional Scoring):** 
+1.  **Stage 1: Map Matching with Temporal and Directional Constraints:** 
     Raw GPS coordinates are mathematically projected onto the defined A* route edges. An Edge Confidence Scoring function (evaluating distance, heading alignment, and path continuity) resolves ambiguous intersections. A **lightweight temporal filtering system** (inspired by Kalman filtering) applies Linear Interpolation to smooth coordinate corrections and prevent visual jumping.
-2.  **Level 2 Absolute Correction (Physical Ground Truth):** 
     Operating entirely within the browser via the native `BarcodeDetector` API, the system scans physical QR anchors arrayed at critical campus decision-points. Upon detection, the AR engine triggers a "Hard Reset", nullifying accumulated trajectory drift and cementing the user's coordinate frame to an absolute Ground Truth matrix.
+
+This design transforms localization from a passive sensing problem into an active constraint-driven estimation process.
 
 ### 8.2 Confidence-Aware Visualization
 A key contribution is the **Confidence Cone** projection. When sensor uncertainty (GPS drift or magnetometer variance) exceeds $E_{max}$, the AR arrow morphs into an expanded cone, visually communicating ambiguity to the user to prevent over-reliance on inaccurate sensors.
@@ -501,6 +507,8 @@ $$\sigma_p(t) = \sqrt{\sigma_{GPS}^2(t) + \sigma_{drift}^2(t)}$$
 The AR **Confidence Cone** angle $\theta$ is projected as:
 $$\theta(t) = 2 \cdot \arctan\left(\frac{\sigma_p(t)}{d}\right)$$
 
+This enables users to perceive uncertainty spatially rather than numerically, improving decision-making under ambiguity.
+
 ### 10.2 Proof of Admissibility
 The Euclidean distance heuristic $h(n)$ is admissible because it is the straight-line lower bound of travel between two points; therefore, $h(n) \leq h^*(n)$, guaranteeing A* optimality.
 
@@ -552,7 +560,7 @@ The application features a **Self-Reflecting UI** (Thesis Tab) where this `READM
 - **Lack of Visual SLAM:** System relies entirely on geospatial alignment (GPS+Compass) rather than camera-based visual localization (Visual SLAM/VPS), meaning the AR overlay cannot verify its own position against visual features.
 - **GPS Drift:** Consumer sensors fluctuate ±5–10 m, which causes AR guidance mismatches at complex junctions.
 - **Static Spatial Model:** The environment is a pre-scanned digital representation, lacking the dynamic, real-time sync required to be classified as a true "Digital Twin."
-- **Indoor simulation:** Indoor tracking is partially simulated in the web environment due to browser security restrictions on hardware APIs.
+- **Indoor tracking is partially simulated** in the web environment due to browser security restrictions on hardware APIs.
 
 ### 14.2 Future Directions
 - **Visual Localization Integration:** Implementing basic marker-based or lightweight Visual SLAM to verify device position independently of GPS.
@@ -571,6 +579,23 @@ The application features a **Self-Reflecting UI** (Thesis Tab) where this `READM
 To verify benchmarks:
 1. Run `import { benchmarkNavigation } from './src/benchmarks/AStarStressTest'`.
 2. Execute `benchmarkNavigation(100)` in the console to record Mean/SD for pathfinding.
+---
+
+## 16. Usage Guide
+
+1. **Orientation**: Open the "AR" tab and grant camera/sensor permissions.
+2. **Search**: Use the NLP interface or destination picker to select a landmark.
+3. **Calibrate**: If positional drift occurs, locate a physical QR anchor and scan it to reset the ground truth.
+4. **Altitude**: Monitor the floor indicator when moving between levels in the Academic Building.
+
+## 17. Project Structure
+
+- `/src/ar`: Marker localization and navigation logic.
+- `/src/components`: React components for UI and overlays.
+- `/src/navigation`: A* graph generation and pathfinding.
+- `/src/sensors`: Sensor bridge for GPS, Barometer, and WiFi.
+- `/src/three`: Digital twin environment and Voxel systems.
+
 ---
 
 ## 18. References
