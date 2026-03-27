@@ -484,7 +484,7 @@ export const ARPage: React.FC = () => {
 
             {/* Destination Confirmation Modal & Map Preview */}
             {arActive && pendingDestId && !destId && (
-                <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.92)', zIndex: 50, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.92)', zIndex: 50, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start', overflowY: 'auto', paddingTop: '20px', paddingBottom: '80px' }}>
                     <h3 style={{ color: '#fff', margin: '0 0 16px 0', fontSize: '20px' }}>Path Preview</h3>
                     
                     {/* Visual Comparison Map layer */}
