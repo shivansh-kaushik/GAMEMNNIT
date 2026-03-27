@@ -2,7 +2,7 @@
 **Target Venues:** IEEE ISMAR (International Symposium on Mixed and Augmented Reality), IEEE VR, or IEEE Smart Cities Conference.
 
 ## 1. Proposed Paper Titles
-- **Title A (Focus on System):** *Uncertainty-Aware Augmented Reality Navigation for Smart Campuses Using Geospatial Spatial Models*
+- **Title A (Focus on System):** *Augmented Reality Navigation for Smart Campuses: using geospatial intelligence*
 - **Title B (Focus on HCI & Cognitive Load):** *Bridging the Explainability Gap in Spatial Navigation: An AR System with Confidence-Aware Visualization*
 - **Title C (Methodological Focus):** *Mitigating Consumer GPS Variance in Mobile WebXR Navigation via Uncertainty-Aware Visual Projection*
 

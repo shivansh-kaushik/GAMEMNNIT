@@ -16,6 +16,7 @@ body,
   overflow: hidden;
   background: #000;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  zoom: 0.5; /* Global 50% zoom as requested */
 }
 
 /* Custom Leaflet Dark Mode */

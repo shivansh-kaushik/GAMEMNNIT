@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Augmented Reality Navigation for Smart Campuses: using geospatial intelligence</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/github-markdown-css/5.5.1/github-markdown.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.0/dist/mermaid.min.js"></script>
+    <style>
+        body {
+            background-color: white;
+            color: #222;
+            font-family: "Times New Roman", Times, Georgia, serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 0;
+        }
+        .markdown-body {
+            box-sizing: border-box;
+            max-width: 800px;
+            margin: 40px auto;
+            padding: 20px 60px;
+            background: #fff;
+        }
+        /* Academic Paper Style Headings */
+        h1 {
+            text-align: center;
+            font-size: 2.2em;
+            margin-bottom: 0.2em;
+            border-bottom: none;
+        }
+        h2 {
+            border-bottom: 1px solid #ddd;
+            padding-bottom: 0.3em;
+            margin-top: 1.5em;
+            font-size: 1.6em;
+        }
+        h3 {
+            font-size: 1.3em;
+            margin-top: 1.2em;
+        }
+        p {
+            margin-bottom: 1.2em;
+            text-align: justify;
+        }
+        /* Style the abstract specifically if it's there */
+        .abstract {
+            font-style: italic;
+            margin: 20px 40px;
+            text-align: center;
+        }
+        pre {
+            background: #f8f8f8;
+            padding: 15px;
+            border: 1px solid #eee;
+            border-radius: 4px;
+            overflow-x: auto;
+            font-family: "Courier New", Courier, monospace;
+            font-size: 0.9em;
+        }
+        blockquote {
+            background: #fdfdfd;
+            border-left: 5px solid #eee;
+            padding: 10px 20px;
+            margin: 20px 0;
+            font-style: italic;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px 12px;
+            text-align: left;
+        }
+        th {
+            background: #f2f2f2;
+        }
+        img {
+            max-width: 100%;
+            height: auto;
+            display: block;
+            margin: 20px auto;
+        }
+        @media print {
+            body { 
+                width: 100%; 
+                margin: 0; 
+                padding: 0; 
+            }
+            .markdown-body {
+                margin: 0;
+                padding: 1in; /* Standard 1 inch academic margin */
+                width: auto;
+                max-width: none;
+            }
+            pre, blockquote, table, figure {
+                page-break-inside: avoid;
+            }
+            h2 {
+                page-break-after: avoid;
+            }
+        }
+    </style>
+</head>
+<body>
+    <article class="markdown-body">
+        <!-- CONTENT_START -->
+        {CONTENT}
+        <!-- CONTENT_END -->
+    </article>
+    <script>
+        mermaid.initialize({ startOnLoad: true, theme: 'default' });
+        
+        // Finalize rendering for print
+        window.onload = () => {
+            // Give mermaid some time to render
+            setTimeout(() => {
+                document.body.classList.add('rendered');
+            }, 2000);
+        };
+    </script>
+</body>
+</html>
