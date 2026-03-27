@@ -8,10 +8,11 @@ interface MapViewProps {
     height: number;
     userLat?: number;
     userLon?: number;
+    userFloor?: number;
     debugMode?: boolean;
 }
 
-export const MapView: React.FC<MapViewProps> = ({ graph, activePath, width, height, userLat, userLon, debugMode = false }) => {
+export const MapView: React.FC<MapViewProps> = ({ graph, activePath, width, height, userLat, userLon, userFloor, debugMode = false }) => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
 
     // Compute bounding box for the graph to scale it correctly on canvas
@@ -209,6 +210,14 @@ export const MapView: React.FC<MapViewProps> = ({ graph, activePath, width, heig
                  ctx.beginPath();
                  ctx.arc(p.x, p.y, 10 + Math.sin(Date.now() / 200) * 2, 0, Math.PI * 2);
                  ctx.stroke();
+
+                 if (userFloor !== undefined) {
+                     ctx.fillStyle = '#fff';
+                     ctx.font = 'bold 10px Inter, sans-serif';
+                     ctx.textAlign = 'center';
+                     const floorLabel = userFloor === 0 ? 'GF' : `F${userFloor}`;
+                     ctx.fillText(floorLabel, p.x, p.y - 12);
+                 }
             }
         };
 
@@ -221,7 +230,7 @@ export const MapView: React.FC<MapViewProps> = ({ graph, activePath, width, heig
         
 
 
-    }, [graph, activePath, width, height, userLat, userLon]);
+    }, [graph, activePath, width, height, userLat, userLon, userFloor]);
 
     return (
         <canvas 

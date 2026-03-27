@@ -9,7 +9,7 @@ import { useNavigationConfidence } from '../hooks/useNavigationConfidence';
 import { useVoiceGuidance } from '../hooks/useVoiceGuidance';
 import { MiniMapOverlay } from '../components/MiniMapOverlay';
 import { FloorIndicator } from '../components/FloorIndicator';
-import { calibrateFloor } from '../sensors/floorDetection';
+import { calibrateFloor, useFloorDetection } from '../sensors/floorDetection';
 
 
 
@@ -108,6 +108,7 @@ export const ARPage: React.FC = () => {
 
     const smoothedHeading = useHeadingSmoothing(sensors?.compassBearing ?? 0, 0.15, 150);
     const confidence = useNavigationConfidence(sensors?.gpsLat ?? 0, sensors?.gpsLon ?? 0, destId);
+    const { floor } = useFloorDetection();
 
     // Voice guidance integration
     const distanceToNextTurn = waypoints.length > 0 ? waypoints[0].distFromPrev : 0;
@@ -189,6 +190,8 @@ export const ARPage: React.FC = () => {
                 for (const e of ENTRANCES) {
                     if (getDistanceM(s.gpsLat, s.gpsLon, e.lat, e.lon) < 10) {
                         foundEnt = e.name;
+                        // AUTOMATED RESET: Snap floor to Ground (0) when entering a building
+                        calibrateFloor(0); 
                         break;
                     }
                 }
@@ -256,8 +259,8 @@ export const ARPage: React.FC = () => {
         const msg = new SpeechSynthesisUtterance('Ground truth established.');
         window.speechSynthesis.speak(msg);
 
-        // STABILIZATION: Reset floor baseline on QR scan (assuming current floor is G/0 if not specified)
-        calibrateFloor(0);
+        // STABILIZATION: Reset floor baseline on QR scan (use payload floor or default to Ground/0)
+        calibrateFloor(payload.floor !== undefined ? payload.floor : 0);
     }, [sensors]);
 
     // Note: Passive background scanning (markerScannerRef) is intentionally REMOVED.
@@ -503,6 +506,7 @@ export const ARPage: React.FC = () => {
                             height={window.innerHeight * 0.4} 
                             userLat={sensors?.gpsLat}
                             userLon={sensors?.gpsLon}
+                            userFloor={floor}
                             debugMode={debugMode}
                         />
                         <GraphDebugToggle active={debugMode} onToggle={() => setDebugMode(!debugMode)} />

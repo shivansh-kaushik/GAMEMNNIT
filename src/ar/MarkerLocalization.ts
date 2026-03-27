@@ -10,6 +10,7 @@ export interface MarkerPayload {
     lat: number;
     lon: number;
     bearing: number; // The exact orientation the user is facing when scanning
+    floor?: number;  // Optional floor level at this anchor location
 }
 
 export class MarkerScanner {
