@@ -140,6 +140,16 @@ export function calibrateFloor(userFloor: number) {
     _floorHistory = [userFloor];
     _wifiStabilitySamples = [userFloor];
 
+    // Broadcast update immediately to update UI
+    const calibratedData: FloorData = {
+        floor: userFloor,
+        source: 'barometer', // Calibration is primarily for barometer tracking
+        confidence: 1.0,
+        timestamp: Date.now()
+    };
+    _latestFloorData = calibratedData;
+    _listeners.forEach(fn => fn(calibratedData));
+
     // Tell native Android layer via JavascriptInterface (if available)
     if ((window as any).AndroidBridge?.calibrateFloor) {
         (window as any).AndroidBridge.calibrateFloor(userFloor);

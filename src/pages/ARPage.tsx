@@ -6,7 +6,6 @@ import logger from '../utils/logger';
 import { AIAssistantPanel } from '../ai/AIAssistantPanel'; // AI layer — does not touch AR logic
 import { useHeadingSmoothing } from '../hooks/useHeadingSmoothing';
 import { useNavigationConfidence } from '../hooks/useNavigationConfidence';
-import { useVoiceGuidance } from '../hooks/useVoiceGuidance';
 import { MiniMapOverlay } from '../components/MiniMapOverlay';
 import { FloorIndicator } from '../components/FloorIndicator';
 import { calibrateFloor, useFloorDetection } from '../sensors/floorDetection';
@@ -102,6 +101,11 @@ export const ARPage: React.FC = () => {
     const [gtAnchorUI, setGtAnchorUI] = useState<{active: boolean, id: string}>({ active: false, id: '' });
     const gtOffsetRef = useRef({ lat: 0, lon: 0 });
 
+    const destIdRef = useRef<string | null>(null);
+    const pathDestRef = useRef<string | null>(null);
+
+    useEffect(() => { destIdRef.current = destId; }, [destId]);
+
     const startLogging = () => { setIsLogging(true); isLoggingRef.current = true; };
     const stopLogging = () => { setIsLogging(false); isLoggingRef.current = false; };
     const downloadLogs = () => logger.download();
@@ -109,12 +113,6 @@ export const ARPage: React.FC = () => {
     const smoothedHeading = useHeadingSmoothing(sensors?.compassBearing ?? 0, 0.15, 150);
     const confidence = useNavigationConfidence(sensors?.gpsLat ?? 0, sensors?.gpsLon ?? 0, destId);
     const { floor } = useFloorDetection();
-
-    // Voice guidance integration
-    const distanceToNextTurn = waypoints.length > 0 ? waypoints[0].distFromPrev : 0;
-    const isFinalDest = waypoints.length <= 1;
-    const turnInstruction = waypoints.length > 0 ? (waypoints[0].label || "Continue straight") : "";
-    useVoiceGuidance(distanceToNextTurn, turnInstruction, isFinalDest);
 
     // ---------- Camera ----------
     const startCamera = useCallback(async () => {
@@ -181,6 +179,15 @@ export const ARPage: React.FC = () => {
                 }
 
                 const deviation = snapped.crossTrackError;
+
+                // 0. Off-Route Recalibration
+                if (deviation > 25 && destIdRef.current) {
+                    console.log(`High deviation (${deviation.toFixed(1)}m). Recalculating path...`);
+                    const newWp = buildARPath(s.gpsLat, s.gpsLon, destIdRef.current, 5);
+                    setWaypoints(newWp);
+                    waypointsRef.current = newWp;
+                    prevSnapRef.current = null;
+                }
 
                 // Next waypoint for calculations
                 const nextWP = waypointsRef.current[Math.min(1, waypointsRef.current.length - 1)];
@@ -269,12 +276,20 @@ export const ARPage: React.FC = () => {
 
     // ---------- Build waypoints when destination changes ----------
     useEffect(() => {
-        if (!destId || !sensors) return;
-        const wp = buildARPath(sensors.gpsLat, sensors.gpsLon, destId, 5);
-        setWaypoints(wp);
-        waypointsRef.current = wp;
+        if (!destId || !sensors || !sensors.gpsLat || !sensors.gpsLon) return;
+        
+        // Prevent regenerating unless the destination actually changed
+        if (pathDestRef.current !== destId) {
+            const wp = buildARPath(sensors.gpsLat, sensors.gpsLon, destId, 5);
+            setWaypoints(wp);
+            waypointsRef.current = wp;
+            pathDestRef.current = destId;
+            prevSnapRef.current = null; // Clear snapping filter history on new route
+        }
+
+        // Keep distance indicator updated without flushing the track
         setDistanceLeft(remainingDistance(sensors.gpsLat, sensors.gpsLon, destId));
-    }, [destId, sensors?.gpsLat, sensors?.gpsLon]);
+    }, [destId, sensors]);
 
     // ---------- Canvas AR overlay ----------
     useEffect(() => {
