@@ -448,19 +448,20 @@ This design transforms localization from a passive sensing problem into an activ
 ### 8.2 Confidence-Aware Visualization
 A key contribution is the **Confidence Cone** projection. When sensor uncertainty (GPS drift or magnetometer variance) exceeds $E_{max}$, the AR arrow morphs into an expanded cone, visually communicating ambiguity to the user to prevent over-reliance on inaccurate sensors.
 
-### 8.3 Context-Aware Navigation Pipeline *(Updated v1.3)*
-The final AR implementation transitions from basic point-to-point visualization to a **closed-loop, road-following navigation system**. As of v1.3, **the AR arrows follow the actual campus road graph** — the same A* graph used by the Map and Graph tabs. The pipeline:
+### 8.3 Context-Aware Navigation Pipeline *(Updated v1.4)*
+The final AR implementation transitions from basic point-to-point visualization to a **closed-loop, road-following navigation system**. As of v1.4, **the AR arrows follow the actual campus road graph** — the same A* graph used by the Map and Graph tabs. The pipeline:
 
 1. **GPS → Road Snap:** Live GPS position is snapped to the nearest node in `mnnit_paths.json`.
 2. **A\* Routing:** Optimal road-following path is computed from start node to destination node.
 3. **GPS Waypoints:** Graph node GPS coordinates feed the AR arrow sequence (no straight-line interpolation).
 4. **Progressive Guidance:** Arrow re-orients at each waypoint toward the next road segment.
+5. **Off-Route Stabilization:** Path destruction loops are mitigated via an intelligent 25m cross-track deviation threshold to prevent jittery recalculations.
 
 Functional capabilities also include:
 -   **Dynamic Waypoint Tracking:** AR arrows strictly align with the local bearing of the *immediate next* A* segment, ensuring realistic turn handling over simple line-of-sight tracking.
 -   **Entrance Proximity Detection:** Geospatial bounding boxes ($d < 10m$) automatically trigger structural entrance notifications for key nodes.
--   **Path Deviation Protection:** Continuous monitoring calculates user divergence from the active route trace, deploying $\Delta_{error} > 8m$ warnings to prevent wrong movement.
--   **Orientation-Based Guidance:** Normalizing Haversine trajectory bearings against live device gyroscope matrices provides immediate spatial directives (`Turn Left` / `Turn Right`).
+-   **Path Deviation Protection & Recalibration:** Continuous monitoring calculates user divergence from the active route trace, deploying $\Delta_{error} > 25m$ triggers to perform soft route-recalculation without resetting the UI.
+-   **Orientation-Based Guidance with AI Throttle:** Normalizing Haversine trajectory bearings against live device gyroscope matrices provides immediate spatial directives (`Turn Left` / `Turn Right`). The central AI agent suppresses overlapping/contradictory commands caused by GPS drift by enforcing a strict command polling loop.
 -   **Telemetry Validation Logging:** A heads-up evaluation panel actively streams `Error`, `Deviation`, and `DistanceToTarget` metrics directly to the underlying client-side logger.
 
 ### 8.4 Hybrid Vertical Localization (Floor Detection)
@@ -468,7 +469,7 @@ To extend the system from 2D routing to 3D spatial awareness, a **Hybrid Vertica
 - **Barometric Altimetry (Primary):** Continuous altitude estimation using `Sensor.TYPE_PRESSURE`, converted to floor levels via a moving-average filter and iterative baseline calibration.
 - **WiFi Fingerprinting (Correction):** Discrete floor verification using Euclidean distance matching against a predefined BSSID/RSSI database (`WifiFingerprints.kt`).
 - **Sensor Fusion:** WiFi results override the barometer when confidence > 0.7, ensuring drift correction during long vertical transitions.
-- **UI Overlay:** A dedicated `FloorIndicator` component displays the current floor, source (🌡 Barometer / 📶 WiFi), and real-time confidence scores.
+- **UI Overlay:** A dedicated `FloorIndicator` component displays the current floor, source (🌡 Barometer / 📶 WiFi), and real-time confidence scores, dynamically driven by an immediate React state-broadcast hook to override Native Android latency.
 
 ### 8.3 Interpretability & Explainable AI Visualization
 To bridge the "Explainability Gap" and demonstrate real-time algorithm execution distinct from traditional 2D navigation systems (e.g. Google Maps), a dedicated **Interpretability Layer** was engineered directly into the pipeline:
