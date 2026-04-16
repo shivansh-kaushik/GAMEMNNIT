@@ -41,11 +41,13 @@ export const GPSTab: React.FC<GPSTabProps> = ({
 
                 <MetricsDashboard 
                     aStarLatencyMs={astarLatency}
-                    gpsAccuracyMeters={data?.accuracy || gpsAccuracy}
+                    gpsAccuracyMeters={/*data?.accuracy ||*/ gpsAccuracy}
                     confidenceConeAngle={coneAngle}
                     crossTrackError={crossTrackError}
                     dslsCorrectionMeters={0.15}
                     pathDeviation={0.2}
+                />
+
                 <div className="text-center pt-4">
                     <h1 className="text-3xl font-black italic uppercase tracking-tighter text-white">System Diagnostics</h1>
                 </div>
@@ -63,9 +65,7 @@ export const GPSTab: React.FC<GPSTabProps> = ({
                         <StatusRow label="Geospatial DB" status="403 Restricted" isError />
                         <StatusRow label="Vector Engine" status="Ready" />
                     </div>
-                        </p>
-                    </div>
-                </div>
+                </Card>
 
                 {data && (
                     <div className="mt-8 text-center text-[10px] text-white/10 font-bold tracking-[0.2em] uppercase italic">
