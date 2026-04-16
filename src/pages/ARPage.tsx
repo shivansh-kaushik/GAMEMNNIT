@@ -1,4 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { Canvas, useFrame } from '@react-three/fiber';
+import { DeviceOrientationControls } from '@react-three/drei';
+import * as THREE from 'three';
+
 import { CAMPUS_BUILDINGS } from '../navigation/buildings';
 import { readSensors, ARSensors, gpsToARWorld } from '../ar/arEngine';
 import { buildARPath, remainingDistance, ARNavWaypoint } from '../ar/arNavigation';
@@ -42,6 +46,70 @@ function getDistanceM(lat1: number, lon1: number, lat2: number, lon2: number) {
  * Opens the device camera and overlays navigation arrows using Canvas 2D API.
  * This is a completely self-contained module – it does not modify any other page.
  */
+
+/**
+ * AROverlayScene — React Three Fiber 3D Visualization
+ * Handles rendering of Path Waypoints and the dynamic Confidence Cone.
+ */
+const AROverlayScene: React.FC<{ waypoints: ARNavWaypoint[], sensors: ARSensors, headingOffset: number, error: number, confidence: string }> = ({ waypoints, sensors, headingOffset, error, confidence }) => {
+    const groupRef = useRef<THREE.Group>(null);
+    const coneRef = useRef<THREE.Mesh>(null);
+
+    useFrame(() => {
+        if (coneRef.current && waypoints.length > 0) {
+            const nextWP = waypoints[Math.min(1, waypoints.length - 1)];
+            // Points exactly at the next coordinate
+            coneRef.current.lookAt(nextWP.x, -1.0, -nextWP.z);
+        }
+    });
+
+    // Thesis: Confidence Cone parameters (theta bounds driven by uncertainty)
+    const baseRadius = 0.4;
+    const dynamicSpread = Math.max(0.1, error * 0.4); // High error = wide cone
+    const coneOpacity = Math.max(0.1, 0.8 - (error * 0.05)); // High error = faint, low = solid
+    
+    // Geographic North (+lat) maps to -Z in Three.js conventionally
+    return (
+        <>
+            <DeviceOrientationControls />
+            <ambientLight intensity={0.8} />
+            <directionalLight position={[0, 10, 0]} intensity={1.5} />
+            
+            <group ref={groupRef} rotation={[0, THREE.MathUtils.degToRad(headingOffset), 0]}>
+                {/* Render Future Waypoints as Glowing Orbs */}
+                {waypoints.slice(0, 5).map((wp, i) => {
+                    const scale = Math.max(0.3, 1 - i * 0.15);
+                    return (
+                        <mesh key={i} position={[wp.x, -1.5, -wp.z]}>
+                            <sphereGeometry args={[scale, 16, 16]} />
+                            <meshStandardMaterial 
+                                color={i === waypoints.length - 1 ? "#ef4444" : "#00ff88"} 
+                                transparent opacity={0.8 - i * 0.1} 
+                                emissive={i === waypoints.length - 1 ? "#ef4444" : "#00ff88"}
+                                emissiveIntensity={0.6}
+                            />
+                        </mesh>
+                    );
+                })}
+
+                {/* The Confidence Cone (Uncertainty-Gated Perception) */}
+                {waypoints.length > 0 && (
+                    <mesh ref={coneRef} position={[0, -1, 0]}>
+                        <cylinderGeometry args={[dynamicSpread, baseRadius, 6, 32]} />
+                        <meshBasicMaterial 
+                            color={confidence === 'Recalculating' ? "#ef4444" : confidence === 'Slightly Off' ? "#eab308" : "#00ff88"}
+                            transparent 
+                            opacity={coneOpacity} 
+                            blending={THREE.AdditiveBlending} 
+                            depthWrite={false}
+                        />
+                    </mesh>
+                )}
+            </group>
+        </>
+    );
+};
+
 interface ARPageProps {
     sharedPath: string[];
     sharedDestinationId: string | null;
@@ -337,142 +405,6 @@ export const ARPage: React.FC<ARPageProps> = ({
         setDistanceLeft(remainingDistance(sensors.gpsLat, sensors.gpsLon, destId));
     }, [sharedPath, destId, sensors?.gpsLat, sensors?.gpsLon, graph]);
 
-    // ---------- Canvas AR overlay ----------
-    useEffect(() => {
-        if (!arActive || !canvasRef.current || !videoRef.current) return;
-
-        const canvas = canvasRef.current;
-        const ctx = canvas.getContext('2d')!;
-
-        const draw = () => {
-            canvas.width = canvas.offsetWidth;
-            canvas.height = canvas.offsetHeight;
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-            const cx = canvas.width / 2;
-            const cy = canvas.height * 0.65;
-
-            if (waypoints.length > 0) {
-                // Geographic Bearing to next waypoint calculation
-                let targetBearing = 0;
-                if (sensors && waypoints.length > 0) {
-                    const nextWP = waypoints[Math.min(1, waypoints.length - 1)];
-                    const dLon = (nextWP.gpsLon - sensors.gpsLon) * Math.PI / 180;
-                    const lat1 = sensors.gpsLat * Math.PI / 180;
-                    const lat2 = nextWP.gpsLat * Math.PI / 180;
-                    const y = Math.sin(dLon) * Math.cos(lat2);
-                    const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLon);
-                    targetBearing = (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
-                }
-
-                // Dynamic AR Rotation (Target Bearing - Phone Compass)
-                const phoneHeading = (smoothedHeading + headingOffset + 360) % 360;
-                const arrowRotation = (targetBearing - phoneHeading) * (Math.PI / 180);
-
-                const arrowCount = Math.min(waypoints.length, 6);
-
-                for (let i = 0; i < arrowCount; i++) {
-                    const scale = 1 - i * 0.12;
-                    const offsetRadius = i * 70 * scale;
-
-                    const arrowSize = 40 * scale;
-                    ctx.save();
-                    
-                    // Translate to base center, then apply compass-relative rotation
-                    ctx.translate(cx, cy);
-                    ctx.rotate(arrowRotation);
-                    
-                    // Move 'up' along the rotated axis
-                    ctx.translate(0, -offsetRadius);
-                    
-                    ctx.globalAlpha = Math.max(0.3, 1 - i * 0.15);
-
-                    // Glow effect
-                    ctx.shadowColor = '#00ff88';
-                    ctx.shadowBlur = 15;
-
-                    // Arrow shape
-                    ctx.fillStyle = i === 0 ? '#00ff88' : '#00cc66';
-                    ctx.beginPath();
-                    ctx.moveTo(0, -arrowSize);
-                    ctx.lineTo(arrowSize * 0.6, arrowSize * 0.4);
-                    ctx.lineTo(arrowSize * 0.25, arrowSize * 0.4);
-                    ctx.lineTo(arrowSize * 0.25, arrowSize);
-                    ctx.lineTo(-arrowSize * 0.25, arrowSize);
-                    ctx.lineTo(-arrowSize * 0.25, arrowSize * 0.4);
-                    ctx.lineTo(-arrowSize * 0.6, arrowSize * 0.4);
-                    ctx.closePath();
-                    ctx.fill();
-
-                    ctx.restore();
-                }
-            }
-
-            // Destination label
-            if (destId && distanceLeft !== null) {
-                const dest = CAMPUS_BUILDINGS.find(b => b.id === destId);
-                if (dest) {
-                    ctx.save();
-                    // Badge background
-                    const text = dest.name;
-                    ctx.font = 'bold 18px Inter, sans-serif';
-                    const tw = ctx.measureText(text).width;
-                    const bw = tw + 30, bh = 56, bx = cx - bw / 2, by = 30;
-
-                    ctx.fillStyle = 'rgba(0,0,0,0.7)';
-                    roundRect(ctx, bx, by, bw, bh, 8);
-                    ctx.fill();
-
-                    ctx.strokeStyle = '#00ff88';
-                    ctx.lineWidth = 1.5;
-                    roundRect(ctx, bx, by, bw, bh, 8);
-                    ctx.stroke();
-
-                    ctx.fillStyle = '#00ff88';
-                    ctx.textAlign = 'center';
-                    ctx.fillText(text, cx, by + 24);
-
-                    ctx.fillStyle = '#aaa';
-                    ctx.font = '13px Inter, sans-serif';
-                    ctx.fillText(`${Math.round(distanceLeft)} m away`, cx, by + 44);
-                    
-                    // Confidence Pill Overlay
-                    let confColor = '#00ff88';
-                    if (confidence === 'Slightly Off') confColor = '#eab308';
-                    if (confidence === 'Recalculating') confColor = '#ef4444';
-                    
-                    ctx.font = 'bold 12px Inter, sans-serif';
-                    const confTw = ctx.measureText(confidence).width;
-                    ctx.fillStyle = 'rgba(0,0,0,0.8)';
-                    roundRect(ctx, cx - confTw/2 - 10, by + 60, confTw + 20, 24, 12);
-                    ctx.fill();
-                    ctx.fillStyle = confColor;
-                    ctx.fillText(confidence, cx, by + 76);
-
-                    ctx.restore();
-                }
-            }
-
-            // Error Handling UI
-            if (sensors && sensors.gpsLat === 25.4920 && sensors.gpsLon === 81.8670) {
-                 ctx.save();
-                 ctx.fillStyle = 'rgba(239,68,68,0.9)';
-                 roundRect(ctx, cx - 100, 100, 200, 30, 8);
-                 ctx.fill();
-                 ctx.fillStyle = '#fff';
-                 ctx.textAlign = 'center';
-                 ctx.font = '13px Inter, sans-serif';
-                 ctx.fillText('Poor GPS accuracy. Move to open area.', cx, 120);
-                 ctx.restore();
-            }
-
-            animRef.current = requestAnimationFrame(draw);
-        };
-
-        animRef.current = requestAnimationFrame(draw);
-        return () => { if (animRef.current) cancelAnimationFrame(animRef.current); };
-    }, [arActive, waypoints, sensors, destId, distanceLeft]);
-
     // ---------- UI ----------
     return (
         <div style={{ width: '100vw', height: '100vh', background: '#000', position: 'relative', overflow: 'hidden' }}>
@@ -502,11 +434,33 @@ export const ARPage: React.FC<ARPageProps> = ({
                 </div>
             ) : (
                 <>
-                    {/* AR Canvas overlay */}
-                    <canvas
-                        ref={canvasRef}
-                        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none' }}
-                    />
+                    
+                    <div style={{ position: 'absolute', inset: 0, zIndex: 1, pointerEvents: 'none' }}>
+                        <Canvas camera={{ position: [0, 1.5, 0] }} style={{ pointerEvents: 'none' }}>
+                            <AROverlayScene waypoints={waypoints} sensors={sensors} headingOffset={headingOffset} error={debugInfo.error} confidence={confidence} />
+                        </Canvas>
+                    </div>
+
+                    {/* Ported Canvas Destination Label and Error Code */}
+                    {arActive && destId && distanceLeft !== null && (
+                        <div style={{ position: 'absolute', top: '100px', left: '50%', transform: 'translateX(-50%)', zIndex: 10, display: 'flex', flexDirection: 'column', alignItems: 'center', pointerEvents: 'none', zoom: isMobile ? 0.8 : 1 }}>
+                            <div style={{ background: 'rgba(0,0,0,0.7)', border: '1.5px solid #00ff88', borderRadius: '8px', padding: '12px 24px', textAlign: 'center', marginBottom: '8px' }}>
+                                <div style={{ color: '#00ff88', fontSize: '18px', fontWeight: 'bold' }}>{CAMPUS_BUILDINGS.find(b => b.id === destId)?.name}</div>
+                                <div style={{ color: '#aaa', fontSize: '13px', marginTop: '4px' }}>{Math.round(distanceLeft)} m away</div>
+                            </div>
+                            
+                            <div style={{ background: 'rgba(0,0,0,0.8)', padding: '4px 16px', borderRadius: '12px', color: confidence === 'Recalculating' ? '#ef4444' : confidence === 'Slightly Off' ? '#eab308' : '#00ff88', fontSize: '12px', fontWeight: 'bold' }}>
+                                {confidence}
+                            </div>
+                        </div>
+                    )}
+                    
+                    {sensors && sensors.gpsLat === 25.4920 && sensors.gpsLon === 81.8670 && (
+                        <div style={{ position: 'absolute', top: '200px', left: '50%', transform: 'translateX(-50%)', background: 'rgba(239,68,68,0.9)', color: '#fff', padding: '8px 16px', borderRadius: '8px', fontSize: '13px', zIndex: 10, pointerEvents: 'none' }}>
+                            Poor GPS accuracy. Move to open area.
+                        </div>
+                    )}
+
                     {/* Floating Mini Map Overlay for close distances */}
                     {arActive && sensors && (
                         <MiniMapOverlay lat={sensors.gpsLat} lon={sensors.gpsLon} destLat={destId ? CAMPUS_BUILDINGS.find(b => b.id === destId)?.latitude : undefined} destLon={destId ? CAMPUS_BUILDINGS.find(b => b.id === destId)?.longitude : undefined} waypoints={waypoints} trajectory={trajectory} />
@@ -574,7 +528,7 @@ export const ARPage: React.FC<ARPageProps> = ({
                     <div style={{ marginBottom: '24px', width: '90%', maxWidth: '400px' }}>
                         <ComparisonPanel 
                             totalNodes={Object.keys(graph.nodes).length}
-                            totalEdges={Object.values(graph.edges).reduce((acc, e) => acc + e.length, 0)}
+                            totalEdges={Object.values(graph.edges).reduce((acc, e: any) => acc + e.length, 0)}
                             pathLength={pathMetrics.length}
                             executionTimeMs={pathMetrics.time}
                         />
