@@ -1,4 +1,14 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
+import { 
+  Bot, 
+  Mic, 
+  Send, 
+  X, 
+  ChevronUp, 
+  ChevronDown, 
+  Navigation,
+  Sparkles
+} from 'lucide-react';
 import { queryLLM, ChatMessage } from './llmClient';
 import { buildNavigationPrompt, parseIntent, NavIntent } from './intentParser';
 import { startListening, stopListening, speak, isSpeechAvailable } from './voiceInput';
@@ -7,21 +17,10 @@ import { ARNavWaypoint } from '../ar/arNavigation';
 import { ARSensors } from '../ar/arEngine';
 import { calibrateFloor } from '../sensors/floorDetection';
 
-
-/**
- * AIAssistantPanel — Floating AI assistant layered on top of the AR view.
- * Extended with live voice guidance loop via directionGenerator + voiceGuidance.
- * Does NOT modify any AR navigation, camera, or A* pathfinding logic.
- */
-
 export interface AIAssistantPanelProps {
-    /** Called when the AI resolves a navigation intent. ARPage wires this to setDestId. */
     onNavigate: (destId: string) => void;
-    /** Whether the AR session is active */
     arActive: boolean;
-    /** Latest sensors from ARPage (GPS + compass heading) */
     sensors: ARSensors | null;
-    /** Latest waypoints from ARPage (updated by A* path builder) */
     waypoints: ARNavWaypoint[];
 }
 
@@ -43,20 +42,17 @@ export const AIAssistantPanel: React.FC<AIAssistantPanelProps> = ({
     const guidanceSession = useRef<{ stop: () => void } | null>(null);
     const chatEndRef = useRef<HTMLDivElement>(null);
 
-    // Auto-scroll chat to bottom
     useEffect(() => {
         if (chatEndRef.current) {
             chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
         }
     }, [chatHistory, status]);
 
-    // ── Keep refs up-to-date so voiceGuidance can always read fresh state ──
     const sensorsRef = useRef(sensors);
     const waypointsRef = useRef(waypoints);
     useEffect(() => { sensorsRef.current = sensors; }, [sensors]);
     useEffect(() => { waypointsRef.current = waypoints; }, [waypoints]);
 
-    // ── Stop guidance when AR is deactivated ──────────────────────────────
     useEffect(() => {
         if (!arActive) {
             guidanceSession.current?.stop();
@@ -66,7 +62,6 @@ export const AIAssistantPanel: React.FC<AIAssistantPanelProps> = ({
         }
     }, [arActive]);
 
-    // ── Start the live voice-guidance loop once a destination is known ────
     const startGuidance = useCallback(() => {
         guidanceSession.current?.stop();
 
@@ -83,8 +78,6 @@ export const AIAssistantPanel: React.FC<AIAssistantPanelProps> = ({
                     setStatus('done');
                     guidanceSession.current?.stop();
                     guidanceSession.current = null;
-                    
-                    // STABILIZATION: Reset floor baseline on arrival at building entrance
                     calibrateFloor(0);
                 }
             }
@@ -94,27 +87,23 @@ export const AIAssistantPanel: React.FC<AIAssistantPanelProps> = ({
         setStatus('guiding');
     }, []);
 
-    // ── React to waypoints being populated (A* just computed a path) ──────
     useEffect(() => {
         if (waypoints.length > 0 && arActive && status !== 'guiding') {
             startGuidance();
         }
     }, [waypoints.length, arActive]); // eslint-disable-line
 
-    // ── Handle intent resolution ──────────────────────────────────────────
     const handleIntent = useCallback((intent: NavIntent) => {
         if (intent.destinationId) {
             onNavigate(intent.destinationId);
-            setActiveDestId(intent.destinationId); // track for system prompt context
+            setActiveDestId(intent.destinationId);
             speak(intent.reply ?? `Navigating to ${intent.destinationName}.`);
-            setStatus('guiding'); // guidance loop will kick in once waypoints arrive
+            setStatus('guiding');
         } else {
             const msg = intent.reply ?? 'Could not find that location.';
             speak(msg);
             setStatus('idle');
         }
-        
-        // Append AI reply to chat history
         setChatHistory(prev => [...prev, { role: 'model', parts: [{ text: intent.reply || 'Request processed.' }] }]);
     }, [onNavigate]);
 
@@ -123,15 +112,11 @@ export const AIAssistantPanel: React.FC<AIAssistantPanelProps> = ({
         setQuery('');
         setStatus('thinking');
 
-        // Append user new message to history
         const newUserMsg: ChatMessage = { role: 'user', parts: [{ text }] };
         const updatedHistory = [...chatHistory, newUserMsg];
         setChatHistory(updatedHistory);
 
-        // Build context-aware prompt
         const sysPrompt = buildNavigationPrompt(sensorsRef.current, activeDestId);
-        
-        // Only send last 6 messages to prevent token bloat
         const recentHistory = updatedHistory.slice(-6);
 
         const llmResult = await queryLLM(recentHistory, sysPrompt);
@@ -167,164 +152,153 @@ export const AIAssistantPanel: React.FC<AIAssistantPanelProps> = ({
         runQuery(query);
     };
 
-    // ── Styles ────────────────────────────────────────────────────────────
-    const statusColor: Record<PanelStatus, string> = {
-        idle: '#aaa', listening: '#f59e0b', thinking: '#38bdf8',
-        guiding: '#00ff88', done: '#a78bfa', error: '#ef4444'
-    };
-    const statusLabel: Record<PanelStatus, string> = {
-        idle: 'Ready', listening: '🎤 Listening…', thinking: '⏳ Thinking…',
-        guiding: '🧭 Guiding', done: '✅ Arrived', error: 'Error'
+    const statusConfig: Record<PanelStatus, { color: string, label: string, icon: boolean }> = {
+        idle: { color: 'text-slate-400', label: 'Ready', icon: false },
+        listening: { color: 'text-orange-500', label: 'Listening...', icon: true },
+        thinking: { color: 'text-blue-400', label: 'Thinking...', icon: true },
+        guiding: { color: 'text-emerald-400', label: 'Navigating', icon: false },
+        done: { color: 'text-purple-400', label: 'Arrived', icon: false },
+        error: { color: 'text-rose-500', label: 'Error', icon: false }
     };
 
     return (
-        <div style={{
-            position: 'absolute',
-            bottom: '100px',
-            left: '50%',
-            transform: 'translateX(-50%)',
-            zIndex: 20,
-            width: '320px',
-            fontFamily: 'Inter, system-ui, sans-serif'
-        }}>
-            {/* Collapsed pill */}
+        <div className="absolute bottom-32 left-1/2 -translate-x-1/2 z-50 w-[340px] font-sans antialiased">
+            {/* Collapsed Status Pill */}
             {!expanded && (
-                <button onClick={() => setExpanded(true)} style={{
-                    display: 'flex', alignItems: 'center', gap: '8px',
-                    margin: '0 auto', padding: '10px 20px',
-                    background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(12px)',
-                    border: '1px solid #444', borderRadius: '30px',
-                    color: '#fff', cursor: 'pointer', fontSize: '13px', fontWeight: 'bold'
-                }}>
-                    🤖 AI Assistant
-                    <span style={{ fontSize: '10px', color: statusColor[status] }}>● {statusLabel[status]}</span>
+                <button 
+                  onClick={() => setExpanded(true)}
+                  className="mx-auto flex items-center gap-3 px-5 py-3 bg-black/80 backdrop-blur-2xl border border-white/10 rounded-full text-white cursor-pointer hover:bg-slate-900/90 transition-all shadow-[0_8px_32px_rgba(0,0,0,0.5)] group"
+                >
+                    <div className="bg-blue-500/20 p-1.5 rounded-full group-hover:scale-110 transition-transform">
+                        <Bot size={16} className="text-blue-400" />
+                    </div>
+                    <span className="text-xs font-black italic uppercase tracking-tighter">AI Assistant</span>
+                    <div className="flex items-center gap-1.5 px-2 py-0.5 bg-white/5 rounded-md">
+                        <div className={`w-1.5 h-1.5 rounded-full ${statusConfig[status].color.replace('text', 'bg')} ${status === 'listening' ? 'animate-ping' : ''}`} />
+                        <span className={`text-[10px] font-bold uppercase tracking-widest ${statusConfig[status].color}`}>
+                            {statusConfig[status].label}
+                        </span>
+                    </div>
                 </button>
             )}
 
-            {/* Expanded panel */}
+            {/* Expanded AI Panel */}
             {expanded && (
-                <div style={{
-                    background: 'rgba(0,0,0,0.88)', backdropFilter: 'blur(16px)',
-                    border: '1px solid #2a2a2a', borderRadius: '16px',
-                    padding: '16px', display: 'flex', flexDirection: 'column', gap: '10px'
-                }}>
+                <div className="bg-slate-950/90 backdrop-blur-3xl border border-white/10 rounded-3xl overflow-hidden flex flex-col shadow-[0_24px_64px_rgba(0,0,0,0.8)] animate-in fade-in zoom-in-95 duration-200">
                     {/* Header */}
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={{ color: '#fff', fontWeight: 'bold', fontSize: '14px' }}>🤖 AI Navigation Assistant</span>
-                        <button onClick={() => setExpanded(false)}
-                            style={{ background: 'none', border: 'none', color: '#666', cursor: 'pointer', fontSize: '18px' }}>×</button>
-                    </div>
-
-                    {/* Live guidance display */}
-                    {status === 'guiding' && guidanceText && (
-                        <div style={{
-                            background: 'rgba(0,255,136,0.1)', border: '1px solid #00ff88',
-                            borderRadius: '8px', padding: '10px',
-                            fontSize: '13px', color: '#00ff88', lineHeight: 1.5,
-                            display: 'flex', alignItems: 'center', gap: '8px'
-                        }}>
-                            🧭 {guidanceText}
+                    <div className="flex justify-between items-center p-4 border-b border-white/5 bg-white/5">
+                        <div className="flex items-center gap-3">
+                            <div className="bg-blue-500 p-2 rounded-xl shadow-[0_0_15px_rgba(59,130,246,0.5)]">
+                                <Sparkles size={16} className="text-white" />
+                            </div>
+                            <div>
+                                <h3 className="text-xs font-black italic uppercase tracking-tighter text-white">Smart Navigation</h3>
+                                <p className={`text-[9px] font-bold uppercase tracking-widest ${statusConfig[status].color}`}>
+                                    {statusConfig[status].label}
+                                </p>
+                            </div>
                         </div>
-                    )}
-
-                    {/* Status */}
-                    <div style={{ fontSize: '11px', color: statusColor[status] }}>
-                        {statusLabel[status]}
+                        <button 
+                          onClick={() => setExpanded(false)}
+                          className="p-2 hover:bg-white/10 rounded-full text-slate-400 transition-colors"
+                        >
+                            <ChevronDown size={20} />
+                        </button>
                     </div>
 
-                    {/* Chat History View (Scrollable) */}
-                    <div style={{
-                        flex: 1, maxHeight: '250px', overflowY: 'auto',
-                        display: 'flex', flexDirection: 'column', gap: '8px',
-                        paddingRight: '6px'
-                    }}>
+                    {/* Chat Area */}
+                    <div className="flex-1 max-h-[300px] overflow-y-auto p-4 flex flex-col gap-4 scrollbar-none">
                         {chatHistory.length === 0 && (
-                            <div style={{ fontSize: '12px', color: '#64748b', textAlign: 'center', margin: '20px 0' }}>
-                                How can I help you navigate the MNNIT Campus today?
+                            <div className="py-10 flex flex-col items-center justify-center text-center gap-3 opacity-40">
+                                <Bot size={40} className="text-slate-500" />
+                                <p className="text-[11px] font-bold uppercase tracking-widest text-slate-400">
+                                    "Take me to the library"<br/>
+                                    "Where is the CSE department?"
+                                </p>
                             </div>
                         )}
+                        
                         {chatHistory.map((msg, i) => (
-                            <div key={i} style={{
-                                alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start',
-                                maxWidth: '85%',
-                                background: msg.role === 'user' ? '#0f172a' : '#1e293b',
-                                color: '#e2e8f0',
-                                padding: '10px 14px',
-                                borderRadius: msg.role === 'user' ? '12px 12px 0 12px' : '12px 12px 12px 0',
-                                fontSize: '13px',
-                                lineHeight: 1.4,
-                                border: `1px solid ${msg.role === 'user' ? '#334155' : '#475569'}`
-                            }}>
-                                {msg.parts[0].text.replace(/\{.*\}/, '') /* hide JSON intent from UI layer */}
+                            <div 
+                              key={i} 
+                              className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}
+                            >
+                                <div className={`max-w-[85%] px-4 py-3 rounded-2xl text-[13px] leading-relaxed shadow-sm ${
+                                    msg.role === 'user' 
+                                    ? 'bg-blue-600 text-white rounded-br-none font-medium' 
+                                    : 'bg-white/10 text-slate-200 rounded-bl-none border border-white/5'
+                                }`}>
+                                    {msg.parts[0].text.replace(/\{.*\}/, '')}
+                                </div>
                             </div>
                         ))}
                         
-                        {/* Typing indicator */}
-                        {status === 'thinking' && (
-                            <div style={{
-                                alignSelf: 'flex-start', background: '#1e293b', padding: '10px 14px',
-                                borderRadius: '12px 12px 12px 0', fontSize: '13px', color: '#94a3b8',
-                                display: 'flex', gap: '4px', alignItems: 'center'
-                            }}>
-                                <span className="typing-dot" style={{ animationDelay: '0s' }}>●</span>
-                                <span className="typing-dot" style={{ animationDelay: '0.2s' }}>●</span>
-                                <span className="typing-dot" style={{ animationDelay: '0.4s' }}>●</span>
+                        {/* Guidance Pulse */}
+                        {status === 'guiding' && guidanceText && (
+                            <div className="mt-2 p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl flex items-center gap-3 animate-pulse">
+                                <Navigation size={14} className="text-emerald-400" />
+                                <p className="text-[12px] font-bold text-emerald-400 leading-tight">
+                                    {guidanceText}
+                                </p>
                             </div>
+                        )}
+                        
+                        {status === 'thinking' && (
+                             <div className="flex gap-1.5 p-3 bg-white/5 w-16 rounded-2xl justify-center items-center">
+                                <div className="w-1 h-1 bg-blue-400 rounded-full animate-bounce [animation-delay:-0.3s]" />
+                                <div className="w-1 h-1 bg-blue-400 rounded-full animate-bounce [animation-delay:-0.15s]" />
+                                <div className="w-1 h-1 bg-blue-400 rounded-full animate-bounce" />
+                             </div>
                         )}
                         <div ref={chatEndRef} />
                     </div>
 
-                    {/* Quick Suggestion Chips */}
-                    {status === 'idle' && (
-                        <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '4px', scrollbarWidth: 'none' }}>
-                            {["Where am I?", "Find CSED Building", "Take me to Main Gate"].map(chip => (
-                                <button key={chip} onClick={() => runQuery(chip)} style={{
-                                    flexShrink: 0, padding: '6px 10px', background: '#0f172a',
-                                    border: '1px solid #334155', borderRadius: '16px', color: '#94a3b8',
-                                    fontSize: '11px', cursor: 'pointer', transition: 'all 0.2s'
-                                }}>
-                                    {chip}
+                    {/* Controls */}
+                    <div className="p-4 pt-0">
+                        {/* Chips */}
+                        {status === 'idle' && chatHistory.length === 0 && (
+                            <div className="flex gap-2 overflow-x-auto pb-4 scrollbar-none">
+                                {["Library", "CSE Bldg", "Main Gate"].map(chip => (
+                                    <button 
+                                      key={chip} 
+                                      onClick={() => runQuery(`Take me to ${chip}`)}
+                                      className="whitespace-nowrap px-3 py-1.5 bg-white/5 border border-white/10 rounded-full text-[10px] font-black uppercase tracking-tighter text-slate-400 hover:bg-white/10 transition-colors"
+                                    >
+                                        📍 {chip}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+
+                        <div className="relative flex items-center gap-2">
+                            <form onSubmit={handleTextSubmit} className="flex-1 relative">
+                                <input
+                                    value={query}
+                                    onChange={e => setQuery(e.target.value)}
+                                    placeholder='Ask anything...'
+                                    className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-sm text-white placeholder-slate-500 outline-none focus:border-blue-500/50 focus:bg-white/10 transition-all pr-12"
+                                    disabled={status === 'thinking' || status === 'listening'}
+                                />
+                                <button 
+                                  type="submit"
+                                  disabled={!query.trim() || status === 'thinking'}
+                                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-blue-500 hover:scale-110 disabled:opacity-0 transition-all"
+                                >
+                                    <Send size={20} />
                                 </button>
-                            ))}
+                            </form>
+                            
+                            <button 
+                              onClick={handleVoice}
+                              className={`p-3 rounded-2xl transition-all ${
+                                status === 'listening' 
+                                ? 'bg-orange-500 text-white animate-pulse shadow-[0_0_20px_rgba(249,115,22,0.5)]' 
+                                : 'bg-blue-600 text-white hover:bg-blue-500 shadow-[0_8px_16px_rgba(37,99,235,0.4)]'
+                              }`}
+                            >
+                                <Mic size={20} />
+                            </button>
                         </div>
-                    )}
-
-                    {/* Text input form */}
-                    <form onSubmit={handleTextSubmit} style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
-                        <input
-                            value={query}
-                            onChange={e => setQuery(e.target.value)}
-                            placeholder='"Take me to CSE dept"'
-                            style={{
-                                flex: 1, padding: '10px 14px', background: '#0f172a', color: '#fff',
-                                border: '1px solid #334155', borderRadius: '20px', fontSize: '13px', outline: 'none'
-                            }}
-                            disabled={status === 'thinking' || status === 'listening'}
-                        />
-                        <button type='submit'
-                            disabled={status === 'thinking' || status === 'listening' || !query.trim()}
-                            style={{
-                                padding: '0 16px', background: !query.trim() ? '#334155' : '#00ff88', color: '#000',
-                                border: 'none', borderRadius: '20px', fontWeight: 'bold',
-                                cursor: !query.trim() ? 'not-allowed' : 'pointer', fontSize: '13px',
-                                transition: 'all 0.2s'
-                            }}>
-                            ↑
-                        </button>
-                    </form>
-
-                    <div style={{ fontSize: '10px', color: '#475569', textAlign: 'center', marginTop: '4px' }}>
-                        Memory Enabled · Web Speech API · Live GPS · A* Route (GPT-4o Mini)
-                        <style>
-                            {`
-                            @keyframes typing-dot {
-                                0% { opacity: 0.3; transform: translateY(0px); }
-                                50% { opacity: 1; transform: translateY(-2px); }
-                                100% { opacity: 0.3; transform: translateY(0px); }
-                            }
-                            .typing-dot { animation: typing-dot 1.2s infinite ease-in-out; }
-                            `}
-                        </style>
                     </div>
                 </div>
             )}

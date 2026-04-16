@@ -45,9 +45,15 @@ interface ARPageProps {
     sharedPath: string[];
     sharedDestinationId: string | null;
     onArStop: () => void;
+    onDestinationChange: (id: string | null) => void;
 }
 
-export const ARPage: React.FC<ARPageProps> = ({ sharedPath, sharedDestinationId, onArStop }) => {
+export const ARPage: React.FC<ARPageProps> = ({ 
+    sharedPath, 
+    sharedDestinationId, 
+    onArStop,
+    onDestinationChange
+}) => {
     const isMobile = window.innerWidth < 768;
     const videoRef = useRef<HTMLVideoElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -491,9 +497,7 @@ export const ARPage: React.FC<ARPageProps> = ({ sharedPath, sharedDestinationId,
 
             {/* ─── Layers — Protected Logic ───────────────────── */}
             <AIAssistantPanel
-                onNavigate={(id) => {
-                    console.log("AI Navigation requested for ID:", id);
-                }}
+                onNavigate={onDestinationChange}
                 arActive={arActive}
                 sensors={sensors}
                 waypoints={waypoints}

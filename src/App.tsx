@@ -62,6 +62,7 @@ const App: React.FC = () => {
                         setActivePath([]);
                         setRouteSteps([]);
                     }}
+                    onDestinationChange={setDestinationId}
                 />
             );
             case 'thesis': return <ThesisTab />;
