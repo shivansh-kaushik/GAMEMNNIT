@@ -8,7 +8,7 @@ import {
   GraduationCap 
 } from 'lucide-react';
 
-export type TabId = 'map' | 'ar' | 'metrics' | 'graph' | 'voxel' | 'thesis';
+export type TabId = 'map' | 'ar' | 'metrics' | 'graph' | 'voxel' | 'layout' | 'thesis';
 
 interface TabConfig {
   id: TabId;
@@ -27,6 +27,7 @@ export const BottomNav = ({ activeTab, onTabChange, darkMode = false }: {
     { id: 'metrics', label: 'Stats', icon: <BarChart3 size={18} /> },
     { id: 'graph', label: 'Nodes', icon: <Network size={18} /> },
     { id: 'voxel', label: 'Campus', icon: <Box size={18} /> },
+    { id: 'layout', label: 'Layout', icon: <Box size={18} /> },
     { id: 'thesis', label: 'Report', icon: <GraduationCap size={18} /> },
   ];
 

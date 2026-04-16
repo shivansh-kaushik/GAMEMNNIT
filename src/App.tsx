@@ -6,6 +6,7 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 // Lazy load components for performance
 const VoxelCampus = lazy(() => import('./pages/VoxelCampus').then(m => ({ default: m.VoxelCampus })));
 const RealMap = lazy(() => import('./pages/RealMap').then(m => ({ default: m.RealMap })));
+const LayoutToolTab = lazy(() => import('./pages/LayoutToolTab').then(m => ({ default: m.LayoutToolTab })));
 const GPSTab = lazy(() => import('./pages/GPSTab').then(m => ({ default: m.GPSTab })));
 const PositioningPage = lazy(() => import('./pages/PositioningPage').then(m => ({ default: m.PositioningPage })));
 const ARPage = lazy(() => import('./pages/ARPage').then(m => ({ default: m.ARPage })));
@@ -84,6 +85,7 @@ const App: React.FC = () => {
                 </ErrorBoundary>
             );
             case 'thesis': return <ThesisTab />;
+            case 'layout': return <LayoutToolTab />;
             default: return (
                 <VoxelCampus 
                     selectedBuildingId={selectedBuildingId} 
