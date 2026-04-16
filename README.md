@@ -46,7 +46,7 @@
 
 This thesis presents a novel uncertainty-aware augmented reality (AR) navigation system designed for smart campus environments, integrating pre-computed geospatial models, WebXR-based AR overlays, and a lightweight intent parsing interface using a large language model (LLM). Addressing the cognitive burdens of traditional 2D mapping in dense indoor-outdoor transitions, the system employs a 3D geospatial scene graph (~850 nodes, 1,200 edges) for the MNNIT Allahabad campus, fused with consumer-grade sensors via a Dual-Stage Localization System (DSLS). Key innovations include the Confidence Cone visualization for sensor uncertainty propagation and real-time A* pathfinding with interpretability layers.
 
-Empirical evaluation (N=30 simulated trials) suggests the design should reduce navigation confusion events and decrease task-related cognitive load scores under controlled conditions, serving as a robust theoretical prediction rather than a measured real-world outcome. Deployed as a browser-native prototype (MIT License, live at [gamemnnit.vercel.app](https://gamemnnit.vercel.app)), this work advances web-constrained AR by bridging geospatial rigidity with probabilistic sensor feedback.
+Simulation-based evaluation ($N=100$ trials, $\sigma = 5$–$20m$ noise injection) provides evidence that the constraint-based DSLS pipeline reduces trajectory RMSE by up to 50.1% relative to raw GNSS under severe noise conditions (Cohen's $d = 5.25$), with the Confidence Cone abstention mechanism suppressing dangerous wrong-direction events to 0% at high uncertainty. Deployed as a browser-native prototype (MIT License, live at [gamemnnit.vercel.app](https://gamemnnit.vercel.app)), this work advances web-constrained AR by bridging geospatial rigidity with probabilistic sensor feedback.
 
 ---
 
@@ -340,9 +340,9 @@ This work addresses the need for a seamless, hands-free navigation system that i
 The transition from macro-level routing to micro-level indoor destinations remains an unsolved challenge in the web-native space. This project proposes an **immersive, context-aware spatial guidance system** as a solution.
 
 ### 2.3 Real-World Impact
--   **Reduces navigation confusion** through proactive uncertainty visualization and simulated error mitigation.
--   **Minimizes Cognitive Load**: Replaces the mental mapping of 2D plans to 3D spaces with intuitive spatial guidance.
--   **Zero Specialized Hardware**: Runs entirely in modern mobile browsers via WebXR API.
+-   **Reduces navigation confusion**: Simulation evidence suggests that the Confidence Cone abstention mechanism suppresses wrong-direction events under high GPS noise. Generalisability to real-world user behaviour requires future empirical study.
+-   **Minimises Cognitive Load**: Replaces the mental mapping of 2D plans to 3D spaces with intuitive spatial guidance.
+-   **Zero Specialised Hardware**: Runs entirely in modern mobile browsers via WebXR API.
 
 ---
 
@@ -408,7 +408,7 @@ The environment (`src/three/`) serves as the **spatial source of truth**.
 > The system uses a static spatial model and does not implement real-time bidirectional synchronization; therefore, it is more accurately described as a **geospatial scene graph representation**.
 
 -   **Dataset**: ~850 nodes and 1,200 edges covering the MNNIT campus.
--   **Voxel Matrix Editor**: An embedded tool (`campuslayout.html`) enables precise calibration of building positions against the digital twin for geographical accuracy.
+-   **Voxel Matrix Editor**: An embedded tool (`campuslayout.html`) enables precise calibration of building positions against the spatial model for geographical accuracy.
 -   **Coordinate Mapping**: A high-precision pipeline aligns 3D voxel space with WGS84 GPS telemetry via `cos(lat)` adjusted scaling.
 
 ---
@@ -536,7 +536,7 @@ This stable formulation yields a logically sound, structurally stable response p
 Since $\lambda > 0$, $(1 - C(t)) \in [0, 1]$, and $P(t) \in [0, 1]$, we have:
 $$\sigma'_p(t) \leq \sigma_p(t) \cdot (1 + \lambda)$$
 
-This proves the update is **bounded**: even under maximal perceptual inconsistency, the uncertainty cannot grow without limit — it is capped by a factor of $(1+\lambda)$ per timestep. This is a critical stability property absent in unconstrained sensor fusion approaches.
+This demonstrates the update is **bounded**: even under maximal perceptual inconsistency, the uncertainty cannot grow without limit — it is capped by a factor of $(1+\lambda)$ per timestep. This is a critical stability property absent in unconstrained sensor fusion approaches.
 
 > **Final Insight (Thrun et al., 2005):** The UGP framework reinterprets visual observations not as measurement updates in the Bayes filter sense, but as meta-level modifiers of the probability distribution's variance. This preserves trajectory feasibility while enabling graceful degradation under sensor failure — a property aligned with the situation awareness framework of Endsley (1995), where information displayed in decision-compatible spatial format reduces operator error.
 
