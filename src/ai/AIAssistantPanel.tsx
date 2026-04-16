@@ -165,7 +165,7 @@ export const AIAssistantPanel: React.FC<AIAssistantPanelProps> = ({
     };
 
     return (
-        <div className="absolute bottom-32 left-1/2 -translate-x-1/2 z-50 w-[340px] font-sans antialiased">
+        <div className="absolute bottom-28 left-3 z-50 w-[300px] font-sans antialiased">
             {/* Collapsed Status Pill */}
             {!expanded && (
                 <button 

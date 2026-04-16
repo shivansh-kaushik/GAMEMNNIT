@@ -667,20 +667,31 @@ export const ARPage: React.FC<ARPageProps> = ({
                 </div>
             )}
 
-            {/* QR Scan Trigger Button */}
-            {arActive && destId && (
+            {/* QR Scan Trigger Button — always visible when AR is active */}
+            {arActive && (
                 <button
                     onClick={() => setScanMode(true)}
                     style={{
-                        position: 'absolute', bottom: '20px', right: '16px', zIndex: 15,
-                        background: 'rgba(139, 92, 246, 0.85)',
-                        color: '#fff', border: '1px solid rgba(255,255,255,0.5)',
-                        padding: '10px 16px', borderRadius: '20px',
-                        fontSize: '13px', fontWeight: 'bold', cursor: 'pointer',
-                        backdropFilter: 'blur(6px)'
+                        position: 'absolute',
+                        bottom: '80px',
+                        right: '12px',
+                        zIndex: 30,
+                        background: 'linear-gradient(135deg, #7c3aed, #4f46e5)',
+                        color: '#fff',
+                        border: '2px solid rgba(255,255,255,0.3)',
+                        padding: '12px 18px',
+                        borderRadius: '24px',
+                        fontSize: '14px',
+                        fontWeight: 'bold',
+                        cursor: 'pointer',
+                        backdropFilter: 'blur(10px)',
+                        boxShadow: '0 8px 24px rgba(124,58,237,0.5)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
                     }}
                 >
-                    📷 Scan QR Anchor
+                    📷 <span>Scan QR</span>
                 </button>
             )}
 
