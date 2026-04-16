@@ -184,8 +184,18 @@
                 </div>
                 <div class="slider-container">
                     <span>↻ rotation (rad)</span>
-                    <input type="range" id="rotSlider" min="-1.57" max="1.57" step="0.01" value="-0.25">
+                    <button onclick="rotateBldg(-0.2618)" style="background:#3b82f6;color:#fff;padding:6px 12px;font-size:16px;border-radius:6px;"
+                        title="Rotate Left 15°">&#8634;</button>
+                    <input type="range" id="rotSlider" min="-3.14" max="3.14" step="0.01" value="-0.25">
+                    <button onclick="rotateBldg(0.2618)" style="background:#3b82f6;color:#fff;padding:6px 12px;font-size:16px;border-radius:6px;"
+                        title="Rotate Right 15°">&#8635;</button>
                     <span id="rotValue" class="rotation-value">-0.25</span>
+                </div>
+                <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap;">
+                    <button onclick="snapRot(0)"     style="background:#444;color:#fff;font-size:11px;padding:4px 8px;">0°</button>
+                    <button onclick="snapRot(1.5708)" style="background:#444;color:#fff;font-size:11px;padding:4px 8px;">90°</button>
+                    <button onclick="snapRot(3.1416)" style="background:#444;color:#fff;font-size:11px;padding:4px 8px;">180°</button>
+                    <button onclick="snapRot(-1.5708)" style="background:#444;color:#fff;font-size:11px;padding:4px 8px;">-90°</button>
                 </div>
             </div>
             <div id="buildingList"></div>
@@ -799,6 +809,26 @@
             if (!selectedBuilding || !val.trim()) return;
             selectedBuilding.name = val.trim();
             selectedNameSpan.innerText = selectedBuilding.name;
+            drawMap();
+            updatePanel();
+            broadcastLayout();
+        };
+
+        window.rotateBldg = function(delta) {
+            if (!selectedBuilding) return;
+            selectedBuilding.rot[1] = parseFloat((selectedBuilding.rot[1] + delta).toFixed(4));
+            document.getElementById('rotSlider').value = selectedBuilding.rot[1];
+            document.getElementById('rotValue').innerText = selectedBuilding.rot[1].toFixed(3);
+            drawMap();
+            updatePanel();
+            broadcastLayout();
+        };
+
+        window.snapRot = function(val) {
+            if (!selectedBuilding) return;
+            selectedBuilding.rot[1] = val;
+            document.getElementById('rotSlider').value = val;
+            document.getElementById('rotValue').innerText = val.toFixed(3);
             drawMap();
             updatePanel();
             broadcastLayout();
