@@ -1,0 +1,37 @@
+{
+    "parameters": {
+        "N": 500,
+        "junction_angle_deg": 45.0,
+        "distance_to_junction_m": 15.0
+    },
+    "conditions": {
+        "Low (3m)": {
+            "abstention_rate": 0.0,
+            "correct_commit_rate": 0.982,
+            "wrong_commit_rate": 0.018,
+            "mean_cone_width_deg": 22.62,
+            "dangerous_wrong_directions": 9
+        },
+        "Medium (7m)": {
+            "abstention_rate": 1.0,
+            "correct_commit_rate": 0.0,
+            "wrong_commit_rate": 0.0,
+            "mean_cone_width_deg": 50.03,
+            "dangerous_wrong_directions": 0
+        },
+        "High (12m)": {
+            "abstention_rate": 1.0,
+            "correct_commit_rate": 0.0,
+            "wrong_commit_rate": 0.0,
+            "mean_cone_width_deg": 77.32,
+            "dangerous_wrong_directions": 0
+        },
+        "Severe (20m)": {
+            "abstention_rate": 1.0,
+            "correct_commit_rate": 0.0,
+            "wrong_commit_rate": 0.0,
+            "mean_cone_width_deg": 106.26,
+            "dangerous_wrong_directions": 0
+        }
+    }
+}

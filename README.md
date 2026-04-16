@@ -502,7 +502,16 @@ $$\theta(t) = 2 \cdot \arctan\left(\frac{\sigma_p(t)}{d}\right)$$
 This enables users to perceive uncertainty spatially rather than numerically, improving decision-making under ambiguity.
 
 ### 10.2 Uncertainty-Gated Perception Framework (UGP)
-Traditional AR navigation fuses visual observations directly into the state estimator (e.g., $x = f(GPS, Vision)$). We propose an **Uncertainty-Gated Perception (UGP)** framework where perception alters the *belief variance*, not the state ($\sigma = f(GPS, Vision)$).
+
+**Departure from Standard EKF Fusion**
+
+The standard Extended Kalman Filter (EKF) fuses a new observation $z$ directly into the state estimate via the correction step $\hat{x}' = \hat{x} + K(z - H\hat{x})$ (Julier & Uhlmann, 2004). This is unsuitable here: under high positional uncertainty $\sigma_p$, a visual observation may itself be geometrically misaligned due to incorrect AR projection — making direct state correction actively harmful. We depart from this convention and instead modulate the **belief variance** rather than the state estimate:
+
+> $\text{EKF} : x' = f(x, z)$ — observation corrects state directly.
+
+> $\text{UGP} : \sigma' = g(\sigma, C, P)$ — observation modulates uncertainty, never state.
+
+This is a deliberate architectural choice that preserves the stability of the geospatial pipeline under adversarial sensor conditions.
 
 **Continuous Trust Weighting (Sigmoid Gating)**
 We define a continuous perception trust weight $P(t) \in [0, 1]$ via a sigmoid function:
@@ -522,7 +531,14 @@ This stable formulation yields a logically sound, structurally stable response p
 - **Camera ON and structurally consistent** ($C(t) \approx 1$): $\sigma'_p(t) \approx \sigma_p(t)$.
 - **Camera ON but inconsistent:** $\sigma'_p(t)$ aggressively expands, visually broadcasting error states to the user via the Confidence Cone dilation.
 
-> **Final Insight:** We propose an uncertainty-gated perception framework in which visual observations are incorporated not as state estimators, but as confidence modulators through a continuous directional consistency function. This preserves the stability of geospatial localization while enabling adaptive perception under degraded sensing conditions.
+**Lemma 1 — Bounded Uncertainty Growth**
+
+Since $\lambda > 0$, $(1 - C(t)) \in [0, 1]$, and $P(t) \in [0, 1]$, we have:
+$$\sigma'_p(t) \leq \sigma_p(t) \cdot (1 + \lambda)$$
+
+This proves the update is **bounded**: even under maximal perceptual inconsistency, the uncertainty cannot grow without limit — it is capped by a factor of $(1+\lambda)$ per timestep. This is a critical stability property absent in unconstrained sensor fusion approaches.
+
+> **Final Insight (Thrun et al., 2005):** The UGP framework reinterprets visual observations not as measurement updates in the Bayes filter sense, but as meta-level modifiers of the probability distribution's variance. This preserves trajectory feasibility while enabling graceful degradation under sensor failure — a property aligned with the situation awareness framework of Endsley (1995), where information displayed in decision-compatible spatial format reduces operator error.
 
 ### 10.3 Proof of Admissibility
 The Euclidean distance heuristic $h(n)$ is admissible because it is the straight-line lower bound of travel between two points; therefore, $h(n) \leq h^*(n)$, guaranteeing A* optimality.
@@ -588,6 +604,12 @@ The application features a **Self-Reflecting UI** (Thesis Tab) where this `READM
 - **GPS Drift:** Consumer sensors fluctuate ±5–10 m, which causes AR guidance mismatches at complex junctions.
 - **Static Spatial Model:** The environment is a pre-scanned digital representation, lacking the dynamic, real-time sync required to be classified as a true "Geospatial Scene Graph."
 - **Indoor tracking is partially simulated** in the web environment due to browser security restrictions on hardware APIs.
+
+### 14.2 Threats to Validity
+- **Construct validity**: RMSE against a synthetic path is a proxy for real-world navigation utility.
+- **Internal validity**: Simulation assumes uniform Gaussian noise; real GPS exhibits correlated errors (multipath, signal blockage) not modelled here.
+- **External validity**: Results validated on one campus topology (MNNIT). Generalisability to dense urban or multi-building indoor environments is not claimed.
+- **Ecological validity**: QR anchor reset interval (every 15 steps) is a simulation approximation; real scan frequency depends on user behaviour.
 
 ### 14.2 Future Directions
 - **Visual Localization Integration:** Implementing basic marker-based or lightweight Visual SLAM to verify device position independently of GPS.
@@ -676,6 +698,11 @@ To verify benchmarks:
 - **Ouyang, L., et al.** (2022). Training language models to follow instructions with human feedback. *Advances in Neural Information Processing Systems*, 35.
 - **Gemini Team.** (2023). *Gemini: A family of highly capable multimodal models*. arXiv:2312.11805.
 - **W3C Speech API Community Group.** (2024). *Web Speech API specification*. [https://wicg.github.io/speech-api/](https://wicg.github.io/speech-api/)
+
+### 🔬 Probabilistic Localization & Uncertainty
+- **Julier, S. J., & Uhlmann, J. K.** (2004). Unscented filtering and nonlinear estimation. *Proceedings of the IEEE*, 92(3), 401–422.
+- **Thrun, S., Burgard, W., & Fox, D.** (2005). *Probabilistic robotics*. MIT Press.
+- **Endsley, M. R.** (1995). Toward a theory of situation awareness in dynamic systems. *Human Factors*, 37(1), 32–64.
 
 ### 🧠 HCI, Cognitive Load & Evaluation
 - **Sweller, J.** (1988). Cognitive load during problem solving: Effects on learning. *Cognitive Science*, 12(2), 257–285.

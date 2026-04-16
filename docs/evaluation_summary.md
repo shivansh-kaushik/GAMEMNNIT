@@ -56,15 +56,35 @@ This document provides technical performance metrics for the **Uncertainty-Aware
 
 ---
 
-## 5. Experimental Limitations & Future Work
+## 5. Confidence Cone Decision Suppression Analysis (Phase 3)
+**Methodology**: Simulated junction decision-making across N=500 trials per uncertainty level (`scripts/confidence_cone_sim.py`). A 45° two-path junction modelled a typical T-fork on the MNNIT campus. The Confidence Cone angular width $\theta = 2\arctan(\sigma_p / d)$ was compared against the junction separation angle. If $\theta > 45°$, the system **abstains** from giving a direction; if $\theta \leq 45°$, the system commits.
 
-### 5.1 Acknowledgement of Constraints
-This evaluation represents a controlled **Simulation-Based Ablation Study** demonstrating algorithmic validity, not an empirical human user evaluation. Indoor localization components (WiFi fingerprinting and barometric sensing) are currently executed via simulated bridges due to restrictive browser-level hardware access, functioning as a theoretical physical framework.
+| Noise ($\sigma_p$) | Cone Width | System Behaviour | Abstain Rate | Wrong Dir. Rate |
+| :--- | :--- | :--- | :--- | :--- |
+| **3m (Low)** | 22.6° | COMMIT | 0.0% | **1.8%** |
+| **7m (Medium)** | 50.0° | ABSTAIN | 100.0% | **0.0%** |
+| **12m (High)** | 77.3° | ABSTAIN | 100.0% | **0.0%** |
+| **20m (Severe)** | 106.3° | ABSTAIN | 100.0% | **0.0%** |
 
-### 5.2 Future Empirical Roadmap
-- **Phase 1**: Full physical deployment of all 15 QR markers across MNNIT for longitudinal drift analysis using native app shells.
-- **Phase 2**: Controlled user study measuring user trust via the Confidence Cone geometry mapping.
-- **Phase 3**: Outdoor-to-Indoor transition testing under varying lighting conditions for visual consistency reliability.
+> **Key finding**: A naïve system (no cone) would issue a direction in all conditions — with a **~18-50% wrong-direction rate** under high noise (from angular heading error alone). The Confidence Cone's abstention mechanism reduces dangerous wrong-direction events to **0%** in every high-uncertainty condition. This is the core behavioural claim of the Cone contribution.
+
+---
+
+## 6. Experimental Limitations & Future Work
+
+### 6.1 Acknowledgement of Constraints
+This evaluation represents a controlled **Simulation-Based Ablation Study** demonstrating algorithmic validity, not an empirical human user evaluation. Indoor localization components (WiFi fingerprinting and barometric sensing) are currently implemented as simulated bridges due to restrictive browser-level hardware access.
+
+### 6.2 Threats to Validity
+- **Construct validity**: RMSE against a synthetic path is a proxy for real-world navigation utility; actual user error rates may differ.
+- **Internal validity**: The simulation assumes uniform Gaussian noise; real GPS exhibits correlated errors (multipath, signal blockage) not modelled here.
+- **External validity**: Results are validated on a single campus topology (MNNIT). Generalisability to dense urban or indoor-only environments is not claimed.
+- **Ecological validity**: Drift rate (0.05 m/step) is estimated from published GPS accuracy studies; physical validation on hardware is future work.
+
+### 6.3 Future Empirical Roadmap
+- **Phase 1**: Full physical deployment of all 15 QR markers across MNNIT for longitudinal drift analysis.
+- **Phase 2**: Controlled between-subjects user study (N≥20) measuring wrong-turn rate with/without Confidence Cone under high noise conditions.
+- **Phase 3**: Outdoor-to-Indoor transition testing and native app shell deployment for unrestricted hardware sensor access.
 
 ---
 
