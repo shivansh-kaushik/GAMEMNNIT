@@ -151,6 +151,13 @@ export const ARPage: React.FC<ARPageProps> = ({
         }
     }, []);
 
+    // Auto-start camera when ARPage mounts (e.g. from Map transition)
+    useEffect(() => {
+        if (!arActive) {
+            startCamera();
+        }
+    }, [arActive, startCamera]);
+
     const stopCamera = useCallback(() => {
         const stream = videoRef.current?.srcObject as MediaStream | null;
         stream?.getTracks().forEach(t => t.stop());
