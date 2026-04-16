@@ -69,17 +69,20 @@ const App: React.FC = () => {
     };
 
     return (
-        <div style={{ width: '100vw', height: '100vh', margin: 0, padding: 0, background: '#000', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-            <div style={{ flex: 1, position: 'relative' }}>
+        <div className="flex flex-col h-screen w-screen bg-[#030303] overflow-hidden">
+            <main className="flex-1 relative overflow-hidden">
                 <Suspense fallback={
-                    <div style={{ width: '100vw', height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#000', color: '#3b82f6', fontFamily: 'monospace' }}>
-                        INITIALIZING SYSTEM...
+                    <div className="h-full w-full flex items-center justify-center bg-[#030303]">
+                        <div className="w-8 h-8 border-4 border-blue-500/20 border-t-blue-500 rounded-full animate-spin" />
                     </div>
                 }>
-                    {renderTab()}
+                    <div key={activeTab} className="h-full w-full animate-fade-in">
+                        {renderTab()}
+                    </div>
                 </Suspense>
-            </div>
-            <BottomNav activeTab={activeTab} onTabChange={setActiveTab} darkMode={true} />
+            </main>
+
+            <BottomNav activeTab={activeTab} onTabChange={setActiveTab} />
         </div>
     );
 };
