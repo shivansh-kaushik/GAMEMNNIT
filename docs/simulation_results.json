@@ -1,0 +1,27 @@
+{
+    "parameters": {
+        "N": 100,
+        "Alpha": 0.6,
+        "Drift": 0.05
+    },
+    "sigmas": {
+        "5m": {
+            "Baseline_GNSS_RMSE": 7.87,
+            "DSLS_RMSE": 6.95,
+            "DSLS_QR_RMSE": 6.58,
+            "Cohen_D": 1.52
+        },
+        "10m": {
+            "Baseline_GNSS_RMSE": 15.51,
+            "DSLS_RMSE": 9.63,
+            "DSLS_QR_RMSE": 9.23,
+            "Cohen_D": 3.52
+        },
+        "20m": {
+            "Baseline_GNSS_RMSE": 31.26,
+            "DSLS_RMSE": 16.6,
+            "DSLS_QR_RMSE": 15.6,
+            "Cohen_D": 5.25
+        }
+    }
+}

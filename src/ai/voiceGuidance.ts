@@ -1,94 +1,122 @@
+// src/ai/voiceGuidance.ts
 /**
  * voiceGuidance.ts
- * Continuous live-navigation loop that:
- *  1. Reads GPS + compass every 2 s
- *  2. Generates a structured NavInstruction via directionGenerator
- *  3. Enriches it with natural language via Ollama (or falls back to rule-based)
- *  4. Speaks it via SpeechSynthesis if the instruction changed
- *
- * Completely decoupled from the AR rendering and A* engine.
- * Subscribe / unsubscribe pattern — no global state pollution.
+ * Contextual and Stateful Live Navigation loop.
+ * Integrates EMA GPS Smoothing -> Haversine Bearing -> Graph Context -> Output.
  */
 
 import { ARNavWaypoint } from '../ar/arNavigation';
-import { generateInstruction, instructionToText, NavInstruction } from './directionGenerator';
+import { smoothGPS, Position, resetGPSFilter } from '../sensors/smoothGPS';
+import { haversineBearing, haversineDistance, relativeDirection } from '../navigation/bearing';
+import { shouldSpeak, resetVoiceState } from '../navigation/voiceTrigger';
+import { buildVoiceInstruction, GraphNode } from '../navigation/directions';
+import { getProximityAlert } from '../navigation/contextualAwareness';
 import { queryLLM } from './llmClient';
 import { speak } from './voiceInput';
 
-export type GuidanceUpdateCallback = (text: string, instruction: NavInstruction) => void;
+// Mock structure conversion to bind ARNavWaypoint to GraphNode generically
+function mapARToGraphNode(wp: ARNavWaypoint): GraphNode {
+    return {
+        id: wp.x + '_' + wp.z, 
+        lat: wp.lat || 0, // Fallback if lat not dynamically synced over
+        lon: wp.lon || 0,
+        type: wp.type as any,
+        label: wp.label
+    };
+}
+
+export type GuidanceUpdateCallback = (text: string) => void;
 
 interface GuidanceSession {
     stop: () => void;
 }
 
-/**
- * Build an LLM prompt that converts a structured instruction into natural language.
- */
-function buildGuidancePrompt(ins: NavInstruction): string {
-    return `Convert this navigation instruction into a short, friendly spoken direction (1 sentence only, no extra text):
-distance: ${ins.distance} meters
-action: ${ins.action}`;
-}
-
-/**
- * Start the continuous guidance loop.
- * @param getState   Callback to get the latest [lat, lon, heading, waypoints] from ARPage
- * @param onUpdate   Callback called each cycle with the spoken text + raw instruction
- * @returns          { stop } — call stop() to cancel the loop
- */
 export function startVoiceGuidance(
     getState: () => { lat: number; lon: number; heading: number; waypoints: ARNavWaypoint[] },
     onUpdate: GuidanceUpdateCallback
 ): GuidanceSession {
     let running = true;
-    let lastAction = '';
-    let lastDistance = -1;
+    let currentWaypointIndex = 0;
+
+    resetVoiceState();
+    resetGPSFilter();
 
     const tick = async () => {
         if (!running) return;
 
         const { lat, lon, heading, waypoints } = getState();
-        if (waypoints.length === 0) {
+        if (waypoints.length === 0 || currentWaypointIndex >= waypoints.length) {
             setTimeout(tick, 2000);
             return;
         }
 
-        const instruction = generateInstruction(lat, lon, heading, waypoints);
+        // 1. Process GPS Smoothing
+        const rawPos: Position = { lat, lon };
+        const pos = smoothGPS(rawPos);
 
-        // Only update if action or distance changed meaningfully (≥5 m)
-        const distChanged = Math.abs(instruction.distance - lastDistance) >= 5;
-        const actionChanged = instruction.action !== lastAction;
+        // Verify bounds. If the system hasn't populated true GPS back to Waypoints, skip math
+        // (Assuming waypoints have valid lat/lon. If not, use approximation conversion logic here natively)
+        
+        // Convert world-space offsets back to GPS roughly (MNNIT local approximation used originally)
+        const waypointsGPSMapped = waypoints.map(wp => ({
+            id: String(wp.x) + '_' + String(wp.z),
+            lat: wp.lat || (lat + wp.z / 110540),
+            lon: wp.lon || (lon + wp.x / 111320),
+            type: wp.type as any,
+            label: wp.label
+        }));
 
-        if (actionChanged || distChanged) {
-            lastAction = instruction.action;
-            lastDistance = instruction.distance;
+        // 2. Get Next Sequence bounds
+        const nextWaypoint = waypointsGPSMapped[currentWaypointIndex];
+        const waypointAfter = waypointsGPSMapped[currentWaypointIndex + 1];
 
-            // Rule-based text as immediate fallback
-            let text = instructionToText(instruction);
+        // 3. Mathematical Heading vs Path Mapping
+        const bearing = haversineBearing(pos, nextWaypoint);
+        const direction = relativeDirection(heading, bearing);
+        const distance = haversineDistance(pos, nextWaypoint);
 
-            // Try to enrich with LLM
-            const llmResult = await queryLLM(
-                [{ role: 'user', parts: [{ text: buildGuidancePrompt(instruction) }] }],
-                'You are a navigation assistant. Convert the instruction into a single short spoken sentence.'
-            );
-            if (llmResult.ok && llmResult.text.trim().length > 5) {
-                text = llmResult.text.trim();
-            }
+        // 4. Graph Structure Parsing
+        const upcomingNodes = waypointsGPSMapped.slice(currentWaypointIndex);
+        const proximityAlert = getProximityAlert(pos, upcomingNodes);
 
-            speak(text);
-            onUpdate(text, instruction);
-
-            if (instruction.action === 'arrived') {
-                running = false;
-                return;
-            }
+        // 5. Instruction Assembly Priority (Context > Math)
+        let instruction = "";
+        
+        if (proximityAlert) {
+            instruction = proximityAlert;
+        } else {
+            instruction = buildVoiceInstruction(direction, distance, nextWaypoint, waypointAfter);
         }
 
-        if (running) setTimeout(tick, 2000);
+        // 6. Gated State Trigger (Replaces polling blast)
+        if (shouldSpeak(currentWaypointIndex, distance, instruction)) {
+            
+            // Allow LLM override if configured/fast enough, else drop right to Speech
+            // Using direct TTS for latency, background async for UI
+            speak(instruction); 
+            onUpdate(instruction);
+            
+            // Asynchronously request LLM to flavor the UI output
+            queryLLM([{ role: 'user', parts: [{ text: `Convert this navigation instruction into a short, friendly spoken direction: ${instruction}` }]}], 'You are a navigation assistant.')
+            .then(res => {
+                if(res.ok && res.text.trim().length > 5) {
+                    onUpdate(res.text.trim());
+                }
+            }).catch(() => {});
+        }
+
+        // 7. Loop Progression checks
+        if (distance < 8) {
+            currentWaypointIndex++;
+        }
+
+        if (running) {
+             // 1000ms polling allows fast reaction while voiceState prevents spam
+             setTimeout(tick, 1000);
+        }
     };
 
-    // Start with a short initial delay
-    setTimeout(tick, 1500);
+    setTimeout(tick, 1000);
 
     return {
         stop: () => { running = false; }
