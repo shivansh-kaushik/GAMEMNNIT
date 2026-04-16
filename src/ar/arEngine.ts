@@ -6,6 +6,7 @@
 export interface ARSensors {
     gpsLat: number;
     gpsLon: number;
+    gpsAccuracy: number;    // meters
     compassBearing: number; // degrees, 0=North
     pitch: number;          // degrees, tilt of device
 }
@@ -26,13 +27,14 @@ export function gpsToARWorld(lat: number, lon: number, originLat: number, origin
 /** Sample AR sensors from browser APIs */
 export async function readSensors(): Promise<ARSensors> {
     return new Promise((resolve) => {
-        let lat = 25.4920, lon = 81.8670;
+        let lat = 25.4920, lon = 81.8670, accuracy = 10;
         let bearing = 0;
 
         if (navigator.geolocation) {
             navigator.geolocation.getCurrentPosition((pos) => {
                 lat = pos.coords.latitude;
                 lon = pos.coords.longitude;
+                accuracy = pos.coords.accuracy;
             });
         }
 
@@ -41,11 +43,11 @@ export async function readSensors(): Promise<ARSensors> {
             // webkitCompassHeading on iOS, alpha on Android (needs conversion)
             bearing = (e as any).webkitCompassHeading ?? (360 - (e.alpha ?? 0));
             window.removeEventListener('deviceorientation', orientHandler);
-            resolve({ gpsLat: lat, gpsLon: lon, compassBearing: bearing, pitch: e.beta ?? 0 });
+            resolve({ gpsLat: lat, gpsLon: lon, gpsAccuracy: accuracy, compassBearing: bearing, pitch: e.beta ?? 0 });
         };
         window.addEventListener('deviceorientation', orientHandler);
 
         // Fallback timeout
-        setTimeout(() => resolve({ gpsLat: lat, gpsLon: lon, compassBearing: 0, pitch: 0 }), 2000);
+        setTimeout(() => resolve({ gpsLat: lat, gpsLon: lon, gpsAccuracy: 50, compassBearing: 0, pitch: 0 }), 2000);
     });
 }

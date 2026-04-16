@@ -548,19 +548,28 @@ export const ARPage: React.FC = () => {
                 </div>
             )}
 
-            {/* Compass Calibration Button */}
+            {/* GPS Accuracy Pill (Top-Left) */}
             {arActive && (
-                <button 
-                    onClick={() => {
-                        alert("Move phone in a figure-8 motion to calibrate the compass.");
-                        if (sensors) setHeadingOffset(-sensors.compassBearing);
-                    }} 
-                    style={{ position: 'absolute', bottom: '20px', right: '20px', background: 'rgba(0,0,0,0.6)', border: '1px solid #444', color: '#fff', padding: '10px', borderRadius: '50%', cursor: 'pointer', zIndex: 10 }}
-                    title="Calibrate Compass"
-                >
-                    🧭
-                </button>
+                <div style={{
+                    position: 'absolute', top: '16px', left: '16px', zIndex: 30,
+                    background: 'var(--color-surface)', backdropFilter: 'var(--blur-card)',
+                    padding: '8px 12px', borderRadius: 'var(--radius-pill)',
+                    display: 'flex', alignItems: 'center', gap: '8px',
+                    border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 4px 12px rgba(0,0,0,0.3)'
+                }}>
+                    <div style={{
+                        width: '8px', height: '8px', borderRadius: '50%',
+                        background: (sensors?.gpsAccuracy ?? 20) < 5 ? 'var(--color-success)' : (sensors?.gpsAccuracy ?? 20) < 15 ? 'var(--color-warning)' : 'var(--color-danger)',
+                        boxShadow: `0 0 10px ${(sensors?.gpsAccuracy ?? 20) < 5 ? 'var(--color-success)' : (sensors?.gpsAccuracy ?? 20) < 15 ? 'var(--color-warning)' : 'var(--color-danger)}`
+                    }} />
+                    <span style={{ color: '#fff', fontSize: '12px', fontWeight: '600' }}>
+                        GPS: {sensors?.gpsAccuracy?.toFixed(1) ?? '--'}m
+                    </span>
+                </div>
             )}
+
+            {/* AI Assistant Button (Floating Right) */}
+            {arActive && (
 
             {/* Camera error */}
             {cameraError && (
@@ -583,22 +592,48 @@ export const ARPage: React.FC = () => {
                 </div>
             )}
 
-            {/* Smart Navigation Overlays */}
-            {arActive && (
-                <div style={{ position: 'absolute', top: '25%', left: '50%', transform: 'translateX(-50%)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', zIndex: 11, zoom: isMobile ? 0.75 : 1 }}>
-                    {turnMessage && (
-                        <div style={{ background: 'rgba(59, 130, 246, 0.9)', color: '#fff', padding: isMobile ? '8px 16px' : '12px 24px', borderRadius: '30px', fontWeight: 'bold', fontSize: isMobile ? '14px' : '18px', boxShadow: '0 4px 15px rgba(0,0,0,0.5)', border: '2px solid rgba(255,255,255,0.7)' }}>
-                            {turnMessage}
+            {/* Smart Navigation Overlays (Instruction Card) */}
+            {arActive && destId && (
+                <div style={{ 
+                    position: 'absolute', bottom: isMobile ? '120px' : '40px', left: '50%', transform: 'translateX(-50%)', 
+                    width: '90%', maxWidth: '400px', zIndex: 11,
+                    display: 'flex', flexDirection: 'column', gap: '10px'
+                }}>
+                    {/* Main Instruction Card */}
+                    <div style={{ 
+                        background: 'var(--color-surface)', backdropFilter: 'var(--blur-card)',
+                        padding: '20px', borderRadius: 'var(--radius-card)',
+                        border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 10px 40px rgba(0,0,0,0.6)',
+                        display: 'flex', flexDirection: 'column', gap: '12px'
+                    }}>
+                        {/* Progress Dots */}
+                        <div style={{ display: 'flex', gap: '4px', height: '4px' }}>
+                            {activeGraphPath.length > 0 && Array.from({ length: Math.min(activeGraphPath.length, 12) }).map((_, i) => (
+                                <div key={i} style={{ 
+                                    flex: 1, height: '100%', borderRadius: '2px',
+                                    background: (waypoints.length < activeGraphPath.length - i) ? 'var(--color-success)' : (waypoints.length === activeGraphPath.length - i) ? '#fff' : 'rgba(255,255,255,0.1)'
+                                }} />
+                            ))}
                         </div>
-                    )}
-                    {entranceWarning && (
-                        <div style={{ background: 'rgba(16, 185, 129, 0.9)', color: '#fff', padding: isMobile ? '6px 12px' : '10px 20px', borderRadius: '12px', fontWeight: 'bold', fontSize: isMobile ? '12px' : '16px', border: '2px solid rgba(255,255,255,0.5)' }}>
-                            {entranceWarning}
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                            <div style={{ fontSize: '32px' }}>{turnMessage?.includes('Left') ? '⬅' : turnMessage?.includes('Right') ? '➡' : '⬆'}</div>
+                            <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                <span style={{ color: 'var(--color-muted)', fontSize: '12px', fontWeight: 'bold', textTransform: 'uppercase' }}>Current Instruction</span>
+                                <span style={{ color: '#fff', fontSize: '20px', fontWeight: '700' }}>{turnMessage || 'Follow the path'}</span>
+                            </div>
                         </div>
-                    )}
+
+                        {entranceWarning && (
+                            <div style={{ background: 'var(--color-success)', color: '#000', padding: '8px 12px', borderRadius: '8px', fontWeight: 'bold', fontSize: '13px', textAlign: 'center' }}>
+                                ✨ {entranceWarning}
+                            </div>
+                        )}
+                    </div>
+
                     {pathWarning && (
-                        <div style={{ background: 'rgba(239, 68, 68, 0.9)', color: '#fff', padding: isMobile ? '6px 12px' : '10px 20px', borderRadius: '12px', fontWeight: 'bold', fontSize: isMobile ? '12px' : '16px', border: '2px solid rgba(255,255,255,0.5)', animation: 'pulse 1s infinite' }}>
-                            {pathWarning}
+                        <div style={{ background: 'var(--color-danger)', color: '#fff', padding: '12px', borderRadius: '12px', fontWeight: 'bold', fontSize: '14px', border: '2px solid rgba(255,255,255,0.3)', textAlign: 'center', animation: 'pulse 1s infinite' }}>
+                            ⚠ {pathWarning}
                         </div>
                     )}
                 </div>

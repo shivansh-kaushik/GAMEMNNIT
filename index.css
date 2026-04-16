@@ -1,3 +1,18 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+:root {
+  --color-primary:  #185FA5;
+  --color-success:  #5DCAA5;
+  --color-warning:  #EF9F27;
+  --color-danger:   #D85A30;
+  --color-surface:  rgba(12, 28, 44, 0.88);
+  --color-text:     #ffffff;
+  --color-muted:    rgba(255,255,255,0.55);
+  --radius-pill:    50px;
+  --radius-card:    16px;
+  --blur-card:      blur(14px);
+}
+
 *,
 *::before,
 *::after {
@@ -13,7 +28,7 @@ body,
   padding: 0;
   overflow: hidden;
   background: #000;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 }
 
 /* Custom Leaflet Dark Mode */

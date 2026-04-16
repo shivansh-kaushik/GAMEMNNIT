@@ -6,13 +6,13 @@ interface TabsProps {
 }
 
 const TABS = [
-    { id: 'voxel', label: '🧱 VOXEL CAMPUS', icon: '🏰' },
-    { id: 'map', label: '🗺 REAL MAP (AUTO GENERATED)', icon: '🌍' },
-    { id: 'gps', label: '📡 GPS', icon: '📍' },
-    { id: 'wifi', label: '📶 WIFI RSSI', icon: '📡' },
-    { id: 'ar', label: '📷 AR NAVIGATION', icon: '📷' },
-    { id: 'thesis', label: '🎓 THESIS', icon: '📜' },
-    { id: 'layout', label: '📐 LAYOUT TOOL', icon: '🗺️' }
+    { id: 'voxel', label: 'Voxel', icon: '🧱' },
+    { id: 'map', label: 'Map', icon: '🗺️' },
+    { id: 'gps', label: 'GPS', icon: '📍' },
+    { id: 'wifi', label: 'WiFi', icon: '📶' },
+    { id: 'ar', label: 'AR', icon: '📷' },
+    { id: 'thesis', label: 'Thesis', icon: '📜' },
+    { id: 'layout', label: 'Layout', icon: '📐' }
 ];
 
 export const Tabs: React.FC<TabsProps> = ({ activeTab, onTabChange }) => {
@@ -27,20 +27,19 @@ export const Tabs: React.FC<TabsProps> = ({ activeTab, onTabChange }) => {
     return (
         <div style={{
             position: 'absolute',
-            bottom: isMobile ? '10px' : '20px',
+            bottom: '24px',
             left: '50%',
-            transform: 'translateX(-50%) scale(0.8)', // Scaled down for better fit
-            transformOrigin: 'bottom center',
+            transform: 'translateX(-50%)',
             display: 'flex',
-            gap: isMobile ? '5px' : '10px',
-            background: 'rgba(0,0,0,0.85)',
-            padding: isMobile ? '8px 12px' : '10px 20px',
-            borderRadius: '50px',
-            border: '1px solid rgba(0,255,136,0.3)',
-            backdropFilter: 'blur(15px)',
+            gap: isMobile ? '4px' : '8px',
+            background: 'var(--color-surface)',
+            padding: '6px',
+            borderRadius: 'var(--radius-pill)',
+            border: '1px solid rgba(255,255,255,0.1)',
+            backdropFilter: 'var(--blur-card)',
             zIndex: 3000,
-            boxShadow: '0 10px 30px rgba(0,0,0,0.5)',
-            width: isMobile ? '90vw' : 'auto',
+            boxShadow: '0 20px 40px rgba(0,0,0,0.4)',
+            width: isMobile ? '95vw' : 'auto',
             justifyContent: 'center',
             overflowX: 'auto',
             scrollbarWidth: 'none'
@@ -50,25 +49,25 @@ export const Tabs: React.FC<TabsProps> = ({ activeTab, onTabChange }) => {
                     key={tab.id}
                     onClick={() => onTabChange(tab.id)}
                     style={{
-                        padding: isMobile ? '8px' : '8px 16px',
-                        background: activeTab === tab.id ? 'rgba(0,255,136,0.2)' : 'transparent',
+                        padding: isMobile ? '10px' : '10px 20px',
+                        background: activeTab === tab.id ? 'rgba(255,255,255,0.1)' : 'transparent',
                         border: 'none',
-                        color: activeTab === tab.id ? '#00ff88' : '#aaa',
-                        borderRadius: '25px',
+                        color: activeTab === tab.id ? '#fff' : 'var(--color-muted)',
+                        borderRadius: 'var(--radius-pill)',
                         cursor: 'pointer',
-                        fontSize: isMobile ? '14px' : '12px',
-                        fontWeight: 'bold',
+                        fontSize: '13px',
+                        fontWeight: '600',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
                         gap: '8px',
-                        transition: 'all 0.2s ease',
+                        transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
                         whiteSpace: 'nowrap',
-                        minWidth: isMobile ? '40px' : 'auto'
+                        borderBottom: activeTab === tab.id ? '2px solid var(--color-success)' : '2px solid transparent'
                     }}
                     title={tab.label}
                 >
-                    <span style={{ fontSize: isMobile ? '20px' : '16px' }}>{tab.icon}</span>
+                    <span style={{ fontSize: '18px' }}>{tab.icon}</span>
                     {!isMobile && <span>{tab.label}</span>}
                 </button>
             ))}
