@@ -175,6 +175,13 @@
         <div class="info-panel" id="coordPanel">
             <div id="selectedControls" class="selected-controls">
                 <h3 id="selectedBuildingName">—</h3>
+                <div class="slider-container" style="margin-bottom:8px">
+                    <span style="font-size:12px;color:#aaa">✏️ Rename:</span>
+                    <input type="text" id="renameInput" placeholder="New name..."
+                        style="flex:1;background:#111;color:#fff;border:1px solid #444;border-radius:4px;padding:4px 8px;font-size:13px;"
+                        oninput="liveRename(this.value)"
+                    />
+                </div>
                 <div class="slider-container">
                     <span>↻ rotation (rad)</span>
                     <input type="range" id="rotSlider" min="-1.57" max="1.57" step="0.01" value="-0.25">
@@ -536,14 +543,34 @@
         }
 
         // ------------------------------------------------------------
-        // SCREEN <-> WORLD conversion
+        // VIEWPORT: auto-fit to building bounding box
         // ------------------------------------------------------------
+        let VIEW = { scale: 1.0, offsetX: 0, offsetY: 0 };
+
+        function computeViewport() {
+            if (!BUILDINGS.length) return;
+            let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+            BUILDINGS.forEach(b => {
+                const hw = b.size[0] / 2 + 40;
+                const hd = b.size[2] / 2 + 40;
+                minX = Math.min(minX, b.pos[0] - hw);
+                maxX = Math.max(maxX, b.pos[0] + hw);
+                minZ = Math.min(minZ, b.pos[2] - hd);
+                maxZ = Math.max(maxZ, b.pos[2] + hd);
+            });
+            const padding = 60;
+            const worldW = maxX - minX;
+            const worldH = maxZ - minZ;
+            const scaleX = (canvas.width  - padding * 2) / worldW;
+            const scaleZ = (canvas.height - padding * 2) / worldH;
+            VIEW.scale   = Math.min(scaleX, scaleZ);
+            VIEW.offsetX = padding - minX * VIEW.scale;
+            VIEW.offsetY = padding - minZ * VIEW.scale;
+        }
+
         function screenToWorld(screenX, screenY) {
-            const scale = 1.3;
-            const offsetX = canvas.width / 2 - 100;
-            const offsetY = canvas.height / 2 + 150;
-            const worldX = (screenX - offsetX) / scale;
-            const worldZ = (screenY - offsetY) / scale;
+            const worldX = (screenX - VIEW.offsetX) / VIEW.scale;
+            const worldZ = (screenY - VIEW.offsetY) / VIEW.scale;
             return { x: worldX, z: worldZ };
         }
 
@@ -560,9 +587,9 @@
 
         function drawRotatedRect(item) {
             ctx.save();
-            const scale = 1.3;
-            const offsetX = canvas.width / 2 - 100;
-            const offsetY = canvas.height / 2 + 150;
+            const scale   = VIEW.scale;
+            const offsetX = VIEW.offsetX;
+            const offsetY = VIEW.offsetY;
 
             const cx = (item.pos[0] * scale) + offsetX;
             const cy = (item.pos[2] * scale) + offsetY;
@@ -573,37 +600,60 @@
             const w = item.size[0] * scale;
             const h = item.size[2] * scale;
 
+            // selected highlight
+            if (selectedBuilding && selectedBuilding.id === item.id) {
+                ctx.shadowColor = '#00ff88';
+                ctx.shadowBlur = 12;
+            }
+
             ctx.fillStyle = item.color;
-            ctx.strokeStyle = '#fff';
-            ctx.lineWidth = 1;
-            ctx.globalAlpha = 0.7;
+            ctx.strokeStyle = selectedBuilding && selectedBuilding.id === item.id ? '#00ff88' : '#fff';
+            ctx.lineWidth = selectedBuilding && selectedBuilding.id === item.id ? 2 : 1;
+            ctx.globalAlpha = 0.8;
 
             ctx.fillRect(-w / 2, -h / 2, w, h);
             ctx.strokeRect(-w / 2, -h / 2, w, h);
 
-            ctx.fillStyle = '#ff0000';
+            // Front edge marker
+            ctx.fillStyle = '#ff4444';
             ctx.globalAlpha = 1;
-            ctx.fillRect(-w / 2, h / 2 - 2, w, 2);
+            ctx.shadowBlur = 0;
+            ctx.fillRect(-w / 2, h / 2 - 3, w, 3);
 
             ctx.restore();
 
+            // Label — draw full name, truncated
             ctx.fillStyle = '#fff';
-            ctx.font = '10px Arial';
+            ctx.font = `bold ${Math.max(9, Math.min(12, w / 6))}px Inter, sans-serif`;
             ctx.textAlign = 'center';
-            ctx.fillText(item.name.split(' ')[0], cx, cy);
+            const label = item.name.length > 12 ? item.name.slice(0, 10) + '…' : item.name;
+            ctx.fillText(label, cx, cy + 4);
         }
 
         function drawMap() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            ctx.strokeStyle = '#222';
+            // Subtle grid aligned to world units
+            const gridStep = 50; // world units
+            ctx.strokeStyle = '#1e1e1e';
             ctx.lineWidth = 1;
-            for (let x = 0; x < canvas.width; x += 50) {
-                ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
+            const startWorldX = Math.floor(-VIEW.offsetX / VIEW.scale / gridStep) * gridStep;
+            const startWorldZ = Math.floor(-VIEW.offsetY / VIEW.scale / gridStep) * gridStep;
+            for (let wx = startWorldX; wx * VIEW.scale + VIEW.offsetX < canvas.width + 100; wx += gridStep) {
+                const sx = wx * VIEW.scale + VIEW.offsetX;
+                ctx.beginPath(); ctx.moveTo(sx, 0); ctx.lineTo(sx, canvas.height); ctx.stroke();
             }
-            for (let y = 0; y < canvas.height; y += 50) {
-                ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
+            for (let wz = startWorldZ; wz * VIEW.scale + VIEW.offsetY < canvas.height + 100; wz += gridStep) {
+                const sy = wz * VIEW.scale + VIEW.offsetY;
+                ctx.beginPath(); ctx.moveTo(0, sy); ctx.lineTo(canvas.width, sy); ctx.stroke();
             }
+
+            // World-space origin cross
+            ctx.strokeStyle = '#333';
+            ctx.lineWidth = 1;
+            const ox = VIEW.offsetX, oy = VIEW.offsetY;
+            ctx.beginPath(); ctx.moveTo(ox, 0); ctx.lineTo(ox, canvas.height); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(0, oy); ctx.lineTo(canvas.width, oy); ctx.stroke();
 
             BUILDINGS.forEach(drawRotatedRect);
         }
@@ -648,20 +698,24 @@
             });
             panel.innerHTML = html;
 
+            const renameInput = document.getElementById('renameInput');
             if (selectedBuilding) {
                 selectedControlsDiv.classList.add('visible');
                 selectedNameSpan.innerText = selectedBuilding.name;
+                renameInput.value = selectedBuilding.name;
                 rotSlider.value = selectedBuilding.rot[1];
                 rotValue.innerText = selectedBuilding.rot[1].toFixed(3);
             } else {
                 selectedControlsDiv.classList.remove('visible');
+                renameInput.value = '';
             }
         }
 
         function resizeCanvas() {
             const wrapper = document.querySelector('.map-wrapper');
-            canvas.width = wrapper.clientWidth;
+            canvas.width  = wrapper.clientWidth;
             canvas.height = wrapper.clientHeight;
+            computeViewport();
             drawMap();
         }
         window.addEventListener('resize', resizeCanvas);
@@ -739,6 +793,15 @@
             // file triggers download; here we just call the same function.
             // However, to avoid recursion, we override it.
             console.log("Save as HTML is available from the original file.");
+        };
+
+        window.liveRename = function(val) {
+            if (!selectedBuilding || !val.trim()) return;
+            selectedBuilding.name = val.trim();
+            selectedNameSpan.innerText = selectedBuilding.name;
+            drawMap();
+            updatePanel();
+            broadcastLayout();
         };
 
         // Initialise
