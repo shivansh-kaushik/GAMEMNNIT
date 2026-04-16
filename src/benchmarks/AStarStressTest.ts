@@ -4,7 +4,12 @@
  */
 
 import { aStar } from '../navigation/astar';
-import { nodes, edges } from '../data/campusGraph';
+import { buildGraphFromGeoJSON } from '../navigation/graphGenerator';
+import pathData from '../data/mnnit_paths.json';
+
+// Pre-build the production graph for benchmarking
+const graph = buildGraphFromGeoJSON(pathData as any);
+const { nodes, edges } = graph;
 
 interface BenchmarkResult {
   iterations: number;
@@ -17,14 +22,15 @@ interface BenchmarkResult {
 
 /**
  * benchmarkNavigation
- * Runs 'n' random point-to-point navigation queries to stress test the A* engine.
- * @param n Number of iterations
+ * Runs 'n' random point-to-point navigation queries on the production campus graph.
  */
-export function benchmarkNavigation(n: number = 100): BenchmarkResult {
+export function benchmarkNavigation(n: number = 250): BenchmarkResult {
   const nodeIds = Object.keys(nodes);
   const times: number[] = [];
 
-  console.log(`🚀 Starting A* Stress Test (${n} iterations)...`);
+  if (nodeIds.length === 0) {
+      return { iterations: 0, meanMs: 0, stdDevMs: 0, p99Ms: 0, minMs: 0, maxMs: 0 };
+  }
 
   for (let i = 0; i < n; i++) {
     const startNode = nodeIds[Math.floor(Math.random() * nodeIds.length)];
@@ -44,7 +50,7 @@ export function benchmarkNavigation(n: number = 100): BenchmarkResult {
   const min = sortedTimes[0];
   const max = sortedTimes[n - 1];
 
-  const result = {
+  return {
     iterations: n,
     meanMs: Number(mean.toFixed(4)),
     stdDevMs: Number(stdDev.toFixed(4)),
@@ -52,12 +58,8 @@ export function benchmarkNavigation(n: number = 100): BenchmarkResult {
     minMs: Number(min.toFixed(4)),
     maxMs: Number(max.toFixed(4))
   };
-
-  console.table(result);
-  return result;
 }
 
-// Attach to window for easy execution in browser console (M.Tech Defense)
 if (typeof window !== 'undefined') {
   (window as any).benchmarkNavigation = benchmarkNavigation;
 }

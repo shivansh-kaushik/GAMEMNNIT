@@ -46,23 +46,23 @@ export const GPSTab: React.FC<GPSTabProps> = ({
                     crossTrackError={crossTrackError}
                     dslsCorrectionMeters={0.15}
                     pathDeviation={0.2}
-                    distanceToTarget={140}
-                />
+                <div className="text-center pt-4">
+                    <h1 className="text-3xl font-black italic uppercase tracking-tighter text-white">System Diagnostics</h1>
+                </div>
 
-                <div className="mt-8 p-6 bg-slate-900/50 border border-slate-800 rounded-3xl backdrop-blur-xl">
-                    <h2 className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-4 flex items-center gap-2">
-                        <Network size={12} className="text-blue-500" /> Infrastructure Connectivity
-                    </h2>
+                <div className="grid grid-cols-2 gap-4">
+                    <StatCard label="GPS Accuracy" value={`${gpsAccuracy.toFixed(1)}m`} sub="Vertical Gate" icon={<Activity size={16}/>} accent="emerald" />
+                    <StatCard label="A* Latency" value={`${astarLatency.toFixed(1)}ms`} sub="Planning Engine" icon={<Zap size={16}/>} accent="blue" />
+                    <StatCard label="Cross-Track" value={`${crossTrackError.toFixed(2)}m`} sub="Path Deviation" icon={<BarChart3 size={16}/>} accent="blue" />
+                    <StatCard label="Confidence" value={`${coneAngle.toFixed(1)}°`} sub="Heading Lock" icon={<Gauge size={16}/>} accent="emerald" />
+                </div>
+
+                <Card title="Infrastructure Connectivity" icon={<Wifi size={16} />} accent="blue">
                     <div className="flex flex-col gap-3">
                         <StatusRow label="Appwrite Cloud" status="Connected" />
                         <StatusRow label="Geospatial DB" status="403 Restricted" isError />
                         <StatusRow label="Vector Engine" status="Ready" />
                     </div>
-                    
-                    <div className="mt-6 p-3 bg-blue-500/5 rounded-xl border border-blue-500/10">
-                        <p className="text-[10px] text-blue-400 text-center leading-relaxed font-medium">
-                            Origin validation required in Appwrite Console for hostname: <br/>
-                            <span className="font-bold text-white uppercase tracking-tighter">gamemnnit.vercel.app</span>
                         </p>
                     </div>
                 </div>
