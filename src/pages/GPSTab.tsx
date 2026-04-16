@@ -49,12 +49,40 @@ export const GPSTab: React.FC<GPSTabProps> = ({
                     distanceToTarget={140}
                 />
 
+                <div className="mt-8 p-6 bg-slate-900/50 border border-slate-800 rounded-3xl backdrop-blur-xl">
+                    <h2 className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-4 flex items-center gap-2">
+                        <Network size={12} className="text-blue-500" /> Infrastructure Connectivity
+                    </h2>
+                    <div className="flex flex-col gap-3">
+                        <StatusRow label="Appwrite Cloud" status="Connected" />
+                        <StatusRow label="Geospatial DB" status="403 Restricted" isError />
+                        <StatusRow label="Vector Engine" status="Ready" />
+                    </div>
+                    
+                    <div className="mt-6 p-3 bg-blue-500/5 rounded-xl border border-blue-500/10">
+                        <p className="text-[10px] text-blue-400 text-center leading-relaxed font-medium">
+                            Origin validation required in Appwrite Console for hostname: <br/>
+                            <span className="font-bold text-white uppercase tracking-tighter">gamemnnit.vercel.app</span>
+                        </p>
+                    </div>
+                </div>
+
                 {data && (
-                    <div className="mt-8 text-center text-[10px] text-white/20 font-bold tracking-widest uppercase">
-                        Telemetric Stream: {data.latitude.toFixed(5)}, {data.longitude.toFixed(5)} | {new Date(data.timestamp).toLocaleTimeString()}
+                    <div className="mt-8 text-center text-[10px] text-white/10 font-bold tracking-[0.2em] uppercase italic">
+                        Telemetric Stream // {data.latitude.toFixed(5)}, {data.longitude.toFixed(5)} // {new Date(data.timestamp).toLocaleTimeString()}
                     </div>
                 )}
             </div>
         </div>
     );
 };
+
+const StatusRow = ({ label, status, isError = false }: { label: string, status: string, isError?: boolean }) => (
+    <div className="flex justify-between items-center text-[11px]">
+        <span className="text-slate-400 font-medium">{label}</span>
+        <div className="flex items-center gap-2">
+            <div className={`w-1.5 h-1.5 rounded-full ${isError ? 'bg-red-500 animate-pulse' : 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.5)]'}`} />
+            <span className={isError ? 'text-red-400 font-bold' : 'text-slate-200 font-semibold'}>{status}</span>
+        </div>
+    </div>
+);
