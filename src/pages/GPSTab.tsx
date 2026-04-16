@@ -1,7 +1,20 @@
 import React, { useEffect, useState } from 'react';
 import { gpsSensor, GPSData } from '../sensors/gps';
+import { MetricsDashboard } from '../components/ui/MetricsDashboard';
 
-export const GPSTab: React.FC = () => {
+interface GPSTabProps {
+    astarLatency?: number;
+    crossTrackError?: number;
+    gpsAccuracy?: number;
+    coneAngle?: number;
+}
+
+export const GPSTab: React.FC<GPSTabProps> = ({ 
+    astarLatency = 12.5, 
+    crossTrackError = 0.45, 
+    gpsAccuracy = 3.2, 
+    coneAngle = 24.5 
+}) => {
     const [data, setData] = useState<GPSData | null>(null);
     const [error, setError] = useState<string | null>(null);
 
@@ -14,41 +27,34 @@ export const GPSTab: React.FC = () => {
     }, []);
 
     return (
-        <div style={{ width: '100vw', height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0a0a0a', color: 'white', fontFamily: 'monospace' }}>
-            <div style={{ background: '#111', padding: '40px', borderRadius: '15px', border: '1px solid #00ff88', width: '400px', boxShadow: '0 0 50px rgba(0,255,136,0.1)' }}>
-                <h1 style={{ color: '#00ff88', fontSize: '24px', textAlign: 'center', margin: '0 0 30px 0' }}>📡 LIVE GPS SENSORS</h1>
-
+        <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center p-6 pb-24">
+            <div className="w-full max-w-lg">
+                <h1 className="text-blue-500 font-black italic uppercase tracking-tighter text-3xl mb-8 text-center">
+                    System Diagnostics
+                </h1>
+                
                 {error && (
-                    <div style={{ padding: '15px', background: 'rgba(255,0,0,0.1)', border: '1px solid #ff4444', color: '#ff4444', borderRadius: '5px', marginBottom: '20px' }}>
-                        ⚠ Error: {error}
+                    <div className="p-4 bg-red-500/10 border border-red-500/50 text-red-500 rounded-xl mb-6 text-sm font-bold text-center">
+                        ⚠ Sensor Error: {error}
                     </div>
                 )}
 
-                {data ? (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-                        <SensorRow label="LATITUDE" value={data.latitude.toFixed(6)} />
-                        <SensorRow label="LONGITUDE" value={data.longitude.toFixed(6)} />
-                        <SensorRow label="ACCURACY" value={`${data.accuracy?.toFixed(1) || '0'} m`} />
-                        <SensorRow label="ALTITUDE" value={`${data.altitude?.toFixed(1) || '0'} m`} />
-                        <SensorRow label="SPEED" value={`${data.speed?.toFixed(1) || '0'} m/s`} />
-                        <div style={{ marginTop: '20px', textAlign: 'center', fontSize: '10px', color: '#444' }}>
-                            LAST SYNC: {new Date(data.timestamp).toLocaleTimeString()}
-                        </div>
-                    </div>
-                ) : (
-                    <div style={{ textAlign: 'center', color: '#00ff88' }}>
-                        {/* Loading spinner animation would go here */}
-                        WAITING FOR SIGNAL...
+                <MetricsDashboard 
+                    aStarLatencyMs={astarLatency}
+                    gpsAccuracyMeters={data?.accuracy || gpsAccuracy}
+                    confidenceConeAngle={coneAngle}
+                    crossTrackError={crossTrackError}
+                    dslsCorrectionMeters={0.15}
+                    pathDeviation={0.2}
+                    distanceToTarget={140}
+                />
+
+                {data && (
+                    <div className="mt-8 text-center text-[10px] text-white/20 font-bold tracking-widest uppercase">
+                        Telemetric Stream: {data.latitude.toFixed(5)}, {data.longitude.toFixed(5)} | {new Date(data.timestamp).toLocaleTimeString()}
                     </div>
                 )}
             </div>
         </div>
     );
 };
-
-const SensorRow = ({ label, value }: { label: string, value: string }) => (
-    <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #222', paddingBottom: '5px' }}>
-        <span style={{ color: '#666' }}>{label}</span>
-        <span style={{ color: '#fff', fontWeight: 'bold' }}>{value}</span>
-    </div>
-);
