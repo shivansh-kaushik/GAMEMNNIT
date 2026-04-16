@@ -53,40 +53,51 @@ function getDistanceM(lat1: number, lon1: number, lat2: number, lon2: number) {
  */
 const AROverlayScene: React.FC<{ waypoints: ARNavWaypoint[], sensors: ARSensors, headingOffset: number, error: number, confidence: string }> = ({ waypoints, sensors, headingOffset, error, confidence }) => {
     const groupRef = useRef<THREE.Group>(null);
-    const coneRef = useRef<THREE.Mesh>(null);
+    const coneWrapperRef = useRef<THREE.Group>(null);
 
     useFrame(() => {
-        if (coneRef.current && waypoints.length > 0) {
+        if (coneWrapperRef.current && waypoints.length > 0) {
             const nextWP = waypoints[Math.min(1, waypoints.length - 1)];
-            // Points exactly at the next coordinate
-            coneRef.current.lookAt(nextWP.x, -1.0, -nextWP.z);
+            // Group looks at target
+            coneWrapperRef.current.lookAt(nextWP.x, -1.0, -nextWP.z);
         }
     });
 
     // Thesis: Confidence Cone parameters (theta bounds driven by uncertainty)
-    const baseRadius = 0.4;
-    const dynamicSpread = Math.max(0.1, error * 0.4); // High error = wide cone
-    const coneOpacity = Math.max(0.1, 0.8 - (error * 0.05)); // High error = faint, low = solid
+    const baseRadius = 0.5;
+    const dynamicSpread = Math.max(0.1, error * 0.5); 
+    const coneOpacity = Math.max(0.2, 0.9 - (error * 0.04)); 
     
-    // Geographic North (+lat) maps to -Z in Three.js conventionally
     return (
         <>
             <DeviceOrientationControls />
-            <ambientLight intensity={0.8} />
-            <directionalLight position={[0, 10, 0]} intensity={1.5} />
+            <ambientLight intensity={0.5} />
+            <pointLight position={[0, 2, 0]} intensity={2.0} />
             
             <group ref={groupRef} rotation={[0, THREE.MathUtils.degToRad(headingOffset), 0]}>
+                {/* 🚨 SLEDGEHAMMER TEST OBJECT (1 meter in front - UNDENIABLE) */}
+                <mesh position={[0, 0, -1]}>
+                    <boxGeometry args={[0.5, 0.5, 0.5]} />
+                    <meshStandardMaterial color="#ff0000" emissive="#ff0000" emissiveIntensity={2} />
+                </mesh>
+
+                {/* 🚨 TEST OBJECT (Static North Reference - 5m away) */}
+                <mesh position={[0, -1, -5]}>
+                    <boxGeometry args={[0.5, 0.5, 0.5]} />
+                    <meshBasicMaterial color="#ef4444" wireframe />
+                </mesh>
+
                 {/* Render Future Waypoints as Glowing Orbs */}
-                {waypoints.slice(0, 5).map((wp, i) => {
-                    const scale = Math.max(0.3, 1 - i * 0.15);
+                {waypoints.slice(0, 8).map((wp, i) => {
+                    const scale = Math.max(0.8, 2.5 - i * 0.3);
                     return (
-                        <mesh key={i} position={[wp.x, -1.5, -wp.z]}>
-                            <sphereGeometry args={[scale, 16, 16]} />
+                        <mesh key={i} position={[wp.x, -1.0, -wp.z]}>
+                            <sphereGeometry args={[scale, 24, 24]} />
                             <meshStandardMaterial 
                                 color={i === waypoints.length - 1 ? "#ef4444" : "#00ff88"} 
-                                transparent opacity={0.8 - i * 0.1} 
+                                transparent opacity={0.9 - i * 0.1} 
                                 emissive={i === waypoints.length - 1 ? "#ef4444" : "#00ff88"}
-                                emissiveIntensity={0.6}
+                                emissiveIntensity={0.8}
                             />
                         </mesh>
                     );
@@ -94,16 +105,18 @@ const AROverlayScene: React.FC<{ waypoints: ARNavWaypoint[], sensors: ARSensors,
 
                 {/* The Confidence Cone (Uncertainty-Gated Perception) */}
                 {waypoints.length > 0 && (
-                    <mesh ref={coneRef} position={[0, -1, 0]}>
-                        <cylinderGeometry args={[dynamicSpread, baseRadius, 6, 32]} />
-                        <meshBasicMaterial 
-                            color={confidence === 'Recalculating' ? "#ef4444" : confidence === 'Slightly Off' ? "#eab308" : "#00ff88"}
-                            transparent 
-                            opacity={coneOpacity} 
-                            blending={THREE.AdditiveBlending} 
-                            depthWrite={false}
-                        />
-                    </mesh>
+                    <group ref={coneWrapperRef} position={[0, -1, 0]}>
+                        <mesh rotation={[Math.PI / 2, 0, 0]}>
+                            <cylinderGeometry args={[dynamicSpread, baseRadius, 10, 32]} />
+                            <meshBasicMaterial 
+                                color={confidence === 'Recalculating' ? "#ef4444" : confidence === 'Slightly Off' ? "#eab308" : "#00ff88"}
+                                transparent 
+                                opacity={coneOpacity} 
+                                blending={THREE.AdditiveBlending} 
+                                depthWrite={false}
+                            />
+                        </mesh>
+                    </group>
                 )}
             </group>
         </>
@@ -403,7 +416,7 @@ export const ARPage: React.FC<ARPageProps> = ({
         setWaypoints(wp);
         waypointsRef.current = wp;
         setDistanceLeft(remainingDistance(sensors.gpsLat, sensors.gpsLon, destId));
-    }, [sharedPath, destId, sensors?.gpsLat, sensors?.gpsLon, graph]);
+    }, [sharedPath, destId, sensors, graph]);
 
     // ---------- UI ----------
     return (
@@ -435,8 +448,8 @@ export const ARPage: React.FC<ARPageProps> = ({
             ) : (
                 <>
                     
-                    <div style={{ position: 'absolute', inset: 0, zIndex: 1, pointerEvents: 'none' }}>
-                        <Canvas camera={{ position: [0, 1.5, 0] }} style={{ pointerEvents: 'none' }}>
+                    <div style={{ position: 'absolute', inset: 0, zIndex: 10, pointerEvents: 'none' }}>
+                        <Canvas gl={{ alpha: true, antialias: true }} camera={{ position: [0, 0, 0], fov: 70 }} style={{ pointerEvents: 'none' }}>
                             <AROverlayScene waypoints={waypoints} sensors={sensors} headingOffset={headingOffset} error={debugInfo.error} confidence={confidence} />
                         </Canvas>
                     </div>
@@ -647,6 +660,8 @@ export const ARPage: React.FC<ARPageProps> = ({
                 <div style={{ position: 'absolute', top: isMobile ? '55px' : '90px', left: isMobile ? '8px' : '16px', background: 'rgba(0,0,0,0.7)', border: '1px solid #444', borderRadius: '8px', padding: isMobile ? '6px 8px' : '12px', color: '#fff', fontSize: isMobile ? '10px' : '12px', zIndex: 20, fontFamily: 'monospace', zoom: isMobile ? 0.85 : 1 }}>
                     <div style={{ color: '#aaa', marginBottom: '4px', fontWeight: 'bold', textTransform: 'uppercase' }}>Diagnostics</div>
                     <div style={{ display: 'grid', gridTemplateColumns: '70px 1fr', gap: '3px' }}>
+                        <span style={{ color: '#888' }}>3D:</span>
+                        <span style={{ color: '#00ff88' }}>ACTIVE</span>
                         <span style={{ color: '#888' }}>Error:</span>
                         <span style={{ color: '#ef4444' }}>{debugInfo.error.toFixed(1)} m</span>
                         <span style={{ color: '#888' }}>Deviation:</span>
