@@ -326,7 +326,7 @@ export const VoxelCampus: React.FC<VoxelCampusProps> = ({ selectedBuildingId, on
     };
 
     return (
-        <div style={{ width: '100vw', height: '100vh', background: '#000', position: 'relative', touchAction: 'none', overflow: 'hidden' }}>
+        <div style={{ width: '100vw', height: '100%', background: '#000', position: 'relative', touchAction: 'none', overflow: 'hidden' }}>
             <Canvas shadows camera={{ position: [20, 30, 60], fov: isMobile ? 75 : 60 }} style={{ position: 'absolute', inset: 0 }}>
                 <Sky sunPosition={[100, 20, 100]} />
                 <ambientLight intensity={0.5} />

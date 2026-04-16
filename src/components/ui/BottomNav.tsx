@@ -9,7 +9,7 @@ export const BottomNav = ({ activeTab, onTabChange, darkMode = false }: {
 }) => {
   const tabs: TabId[] = ['map', 'ar', 'metrics', 'graph', 'voxel', 'thesis'];
   return (
-    <nav className={`flex justify-around p-2 ${darkMode ? 'bg-slate-900 border-t border-slate-800' : 'bg-white border-t border-gray-100'} sticky bottom-0 z-50 shadow-lg`}>
+    <nav className={`flex justify-around p-2 ${darkMode ? 'bg-slate-900 border-t border-slate-800' : 'bg-white border-t border-gray-100'} relative z-50 shadow-lg`}>
       {tabs.map(t => (
         <button 
           key={t} 

@@ -27,7 +27,7 @@ export const GPSTab: React.FC<GPSTabProps> = ({
     }, []);
 
     return (
-        <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center p-6 pb-24">
+        <div className="h-full bg-[#0a0a0a] flex items-center justify-center p-6 pb-24">
             <div className="w-full max-w-lg">
                 <h1 className="text-blue-500 font-black italic uppercase tracking-tighter text-3xl mb-8 text-center">
                     System Diagnostics

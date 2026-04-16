@@ -150,7 +150,7 @@ export const RealMap: React.FC<RealMapProps> = ({
     }
 
     return (
-        <div style={{ width: '100vw', height: '100vh', background: '#111', position: 'relative' }}>
+        <div style={{ width: '100vw', height: '100%', background: '#111', position: 'relative' }}>
             <Map
                 {...viewState}
                 onMove={evt => setViewState(evt.viewState)}
