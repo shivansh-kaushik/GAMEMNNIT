@@ -46,7 +46,7 @@
 
 This thesis presents a novel uncertainty-aware augmented reality (AR) navigation system designed for smart campus environments, integrating pre-computed geospatial models, WebXR-based AR overlays, and a lightweight intent parsing interface using a large language model (LLM). Addressing the cognitive burdens of traditional 2D mapping in dense indoor-outdoor transitions, the system employs a digital twin-inspired 3D spatial graph (~850 nodes, 1,200 edges) for the MNNIT Allahabad campus, fused with consumer-grade sensors via a Dual-Stage Localization System (DSLS). Key innovations include the Confidence Cone visualization for sensor uncertainty propagation and real-time A* pathfinding with interpretability layers.
 
-Empirical evaluation (N=30 simulated trials) demonstrates a reduction in navigation confusion events and a decrease in task-related cognitive load scores under controlled conditions. Deployed as a browser-native prototype (MIT License, live at [gamemnnit.vercel.app](https://gamemnnit.vercel.app)), this work advances web-constrained AR by bridging geospatial rigidity with probabilistic sensor feedback.
+Empirical evaluation (N=30 simulated trials) suggests the design should reduce navigation confusion events and decrease task-related cognitive load scores under controlled conditions, serving as a robust theoretical prediction rather than a measured real-world outcome. Deployed as a browser-native prototype (MIT License, live at [gamemnnit.vercel.app](https://gamemnnit.vercel.app)), this work advances web-constrained AR by bridging geospatial rigidity with probabilistic sensor feedback.
 
 ---
 
@@ -368,7 +368,7 @@ Early work by **Azuma (1997)** established AR foundations, but modern advancemen
 
 ## 4. System Architecture
 
-The system follows a **modular, decoupled architecture** separating visualization (Three.js), routing (A*), and AI inference (Gemini).
+The system follows a **modular, decoupled architecture** separating visualization (Three.js), routing (A*), and AI inference (GPT-4o-mini).
 
 ### 3.1 Implementation Evolution Note
 The project initially explored a Unity-based AR navigation prototype using ARCore. However, due to deployment constraints, accessibility limitations, and the objective of achieving a zero-install solution, the system was redesigned as a browser-native implementation using React, Three.js, and WebXR. The current thesis and repository reflect this final web-based system, which enables cross-platform access and simplified user adoption. Earlier prototype experiments conducted during the Unity phase are excluded from the final analysis to maintain dataset consistency.
@@ -471,7 +471,7 @@ To extend the system from 2D routing to 3D spatial awareness, a **Hybrid Vertica
 - **Sensor Fusion:** WiFi results override the barometer when confidence > 0.7, ensuring drift correction during long vertical transitions.
 - **UI Overlay:** A dedicated `FloorIndicator` component displays the current floor, source (🌡 Barometer / 📶 WiFi), and real-time confidence scores, dynamically driven by an immediate React state-broadcast hook to override Native Android latency.
 
-### 8.3 Interpretability & Explainable AI Visualization
+### 8.5 Interpretability & Explainable AI Visualization
 To bridge the "Explainability Gap" and demonstrate real-time algorithm execution distinct from traditional 2D navigation systems (e.g. Google Maps), a dedicated **Interpretability Layer** was engineered directly into the pipeline:
 -   **Full Graph Rendering (Context):** A faint background rendering of the entire spatial network, establishing immediate context of scale (850 nodes, 1200 edges).
 -   **A\* Exploration Animation:** A dynamic Canvas-based simulation rendering the simulated breadth of the A* algorithm expansion (in yellow) before plotting the optimal trace, demystifying the routing process.
@@ -501,7 +501,30 @@ $$\theta(t) = 2 \cdot \arctan\left(\frac{\sigma_p(t)}{d}\right)$$
 
 This enables users to perceive uncertainty spatially rather than numerically, improving decision-making under ambiguity.
 
-### 10.2 Proof of Admissibility
+### 10.2 Uncertainty-Gated Perception Framework (UGP)
+Traditional AR navigation fuses visual observations directly into the state estimator (e.g., $x = f(GPS, Vision)$). We propose an **Uncertainty-Gated Perception (UGP)** framework where perception alters the *belief variance*, not the state ($\sigma = f(GPS, Vision)$).
+
+**Continuous Trust Weighting (Sigmoid Gating)**
+We define a continuous perception trust weight $P(t) \in [0, 1]$ via a sigmoid function:
+$$P(t) = \frac{1}{1 + e^{-k(\sigma_p(t) - \tau)}}$$
+Where $\tau$ is the critical uncertainty boundary. If $\sigma_p(t)$ is low, $P(t) \approx 0$ (ignore camera). If $\sigma_p(t)$ exceeds $\tau$, $P(t) \approx 1$ (trust camera).
+
+**Gaussian Consistency Model**
+Let $z_v(t) = \theta_{obs}$ (visual direction) and $z_n(t) = \theta_{nav}$ (A* bearing). We compute the wrapped angular residual $r(t) = \text{wrap}(|\theta_{nav} - \theta_{obs}|)$. The spatial consistency $C(t) \in [0, 1]$ is defined smoothly using a Gaussian model:
+$$C(t) = e^{-\frac{r^2(t)}{2\sigma_\theta^2}}$$
+
+**Confidence Update Rule (Core Contribution)**
+The geospatial uncertainty propagates via a multiplicative, weighted update rule:
+$$\sigma'_p(t) = \sigma_p(t) \cdot \left(1 + \lambda (1 - C(t)) \cdot P(t)\right)$$
+
+This stable formulation yields a logically sound, structurally stable response profile:
+- **Camera explicitly OFF** ($P(t) \approx 0$): $\sigma'_p(t) \approx \sigma_p(t)$.
+- **Camera ON and structurally consistent** ($C(t) \approx 1$): $\sigma'_p(t) \approx \sigma_p(t)$.
+- **Camera ON but inconsistent:** $\sigma'_p(t)$ aggressively expands, visually broadcasting error states to the user via the Confidence Cone dilation.
+
+> **Final Insight:** We propose an uncertainty-gated perception framework in which visual observations are incorporated not as state estimators, but as confidence modulators through a continuous directional consistency function. This preserves the stability of geospatial localization while enabling adaptive perception under degraded sensing conditions.
+
+### 10.3 Proof of Admissibility
 The Euclidean distance heuristic $h(n)$ is admissible because it is the straight-line lower bound of travel between two points; therefore, $h(n) \leq h^*(n)$, guaranteeing A* optimality.
 
 ---
@@ -529,7 +552,7 @@ Full physical deployment of QR anchors was not executed due to logistical constr
 ## 11.5 Research Question Analysis
 
 ### RQ1: Confidence Cone Effectiveness
-The simulation demonstrates that visualizing uncertainty reduces abrupt directional errors under high GPS noise conditions. While not validated through user studies, the system shows improved decision stability in constrained trajectories.
+The simulation suggests that visualizing uncertainty should reduce abrupt directional errors under high GPS noise conditions. While not validated through user studies, the system points to improved decision stability in constrained trajectories.
 
 ### RQ2: DSLS vs Raw GNSS
 Compared to raw GPS trajectories, DSLS significantly reduces positional jitter and maintains path adherence under simulated noise, demonstrating improved effective stability.
@@ -570,7 +593,7 @@ The application features a **Self-Reflecting UI** (Thesis Tab) where this `READM
 
 ### 14.3 Practical Deployment Constraints
 
-Indoor localization components (WiFi fingerprinting and barometric sensing) are partially simulated due to browser-level hardware access limitations. Full real-world validation remains future work.
+Indoor localization components (WiFi fingerprinting and barometric sensing) are partially simulated due to browser-level hardware access limitations. Furthermore, full physical deployment of the QR Ground Truth anchors across the campus was not completed due to institutional administrative hurdles and physical scaling constraints. Consequently, the anchor-reset paradigm represents a validated architectural framework rather than a physically deployed infrastructure. Full real-world validation of both the sensor bridge and physical anchors remains critical future work.
 
 ---
 

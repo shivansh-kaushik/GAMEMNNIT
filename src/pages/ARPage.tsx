@@ -9,7 +9,7 @@ import { useNavigationConfidence } from '../hooks/useNavigationConfidence';
 import { MiniMapOverlay } from '../components/MiniMapOverlay';
 import { FloorIndicator } from '../components/FloorIndicator';
 import { calibrateFloor, useFloorDetection } from '../sensors/floorDetection';
-
+import { CameraHintOverlay } from '../ai/CameraHintOverlay';
 
 
 import { MapView } from '../components/MapView';
@@ -686,6 +686,13 @@ export const ARPage: React.FC = () => {
 
             {/* Hybrid Vertical Localization (purely additive overlay) */}
             <FloorIndicator skipCalibration={!arActive} />
+
+            {/* AI Vision Navigation Assistant (purely additive overlay) */}
+            <CameraHintOverlay
+                videoRef={videoRef}
+                arActive={arActive}
+                confidence={confidence}
+            />
         </div>
     );
 };
