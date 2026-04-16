@@ -106,12 +106,7 @@ Rules:
 6. Keep responses concise but include the requested coordinates.
 
 Available Dataset:
-- Library: latitude: 25.49268, longitude: 81.86355
-- CSED Building: latitude: 25.49240, longitude: 81.86370
-- Admin Building: latitude: 25.49210, longitude: 81.86330
-- Main Gate: latitude: 25.49150, longitude: 81.86300
-- Hostel Area: latitude: 25.49310, longitude: 81.86420
-- ${buildingList}
+${CAMPUS_BUILDINGS.slice(0, 15).map(b => `- ${b.name}: latitude: ${b.latitude.toFixed(5)}, longitude: ${b.longitude.toFixed(5)}`).join('\n')}
 
 Example interaction:
 User: "Where is the library?"

@@ -7,6 +7,7 @@ const VoxelCampus = lazy(() => import('./pages/VoxelCampus').then(m => ({ defaul
 const RealMap = lazy(() => import('./pages/RealMap').then(m => ({ default: m.RealMap })));
 const GPSTab = lazy(() => import('./pages/GPSTab').then(m => ({ default: m.GPSTab })));
 const PositioningPage = lazy(() => import('./pages/PositioningPage').then(m => ({ default: m.PositioningPage })));
+const ARPage = lazy(() => import('./pages/ARPage').then(m => ({ default: m.ARPage })));
 const ThesisTab = lazy(() => import('./pages/ThesisTab').then(m => ({ default: m.ThesisTab })));
 
 const App: React.FC = () => {
