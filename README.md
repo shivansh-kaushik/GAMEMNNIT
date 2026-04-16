@@ -602,20 +602,22 @@ The application features a **Self-Reflecting UI** (Thesis Tab) where this `READM
 ### 14.1 Key Limitations
 - **Lack of Visual SLAM:** System relies entirely on geospatial alignment (GPS+Compass) rather than camera-based visual localization (Visual SLAM/VPS), meaning the AR overlay cannot verify its own position against visual features.
 - **GPS Drift:** Consumer sensors fluctuate ±5–10 m, which causes AR guidance mismatches at complex junctions.
-- **Static Spatial Model:** The environment is a pre-scanned digital representation, lacking the dynamic, real-time sync required to be classified as a true "Geospatial Scene Graph."
+- **Static Spatial Model:** The environment is a pre-scanned static geospatial representation, lacking the dynamic, real-time bidirectional physical sync required to be classified as a true **Digital Twin** (Grieves & Vickers, 2017).
+- **Confidence Cone — no direct user validation:** The simulation confirms RMSE reduction under the DSLS pipeline but does not directly measure whether the cone changes user decision behaviour. This remains future empirical work.
 - **Indoor tracking is partially simulated** in the web environment due to browser security restrictions on hardware APIs.
 
 ### 14.2 Threats to Validity
 - **Construct validity**: RMSE against a synthetic path is a proxy for real-world navigation utility.
-- **Internal validity**: Simulation assumes uniform Gaussian noise; real GPS exhibits correlated errors (multipath, signal blockage) not modelled here.
+- **Internal validity**: Simulation assumes uniform Gaussian noise; real GPS exhibits correlated errors (multipath, signal blockage) not modelled here. Effect sizes (Cohen's $d$ up to 5.25) are expected to attenuate under real-world correlated noise conditions.
 - **External validity**: Results validated on one campus topology (MNNIT). Generalisability to dense urban or multi-building indoor environments is not claimed.
 - **Ecological validity**: QR anchor reset interval (every 15 steps) is a simulation approximation; real scan frequency depends on user behaviour.
 
-### 14.2 Future Directions
+### 14.3 Future Directions
 - **Visual Localization Integration:** Implementing basic marker-based or lightweight Visual SLAM to verify device position independently of GPS.
-- **Uncertainty-Aware A\* (UA-A\*):** Modifying the routing engine to penalize paths with historically high signal degradation or GPS multipath errors, achieving integrated hardware-software robustness.
+- **Confidence Cone User Study:** A between-subjects study (N≥20) measuring wrong-turn rate with/without the Cone under high GPS noise, to directly validate the HCI contribution.
+- **Uncertainty-Aware A\* (UA-A\*):** Modifying the routing engine to penalise paths with historically high signal degradation or GPS multipath errors.
 
-### 14.3 Practical Deployment Constraints
+### 14.4 Practical Deployment Constraints
 
 Indoor localization components (WiFi fingerprinting and barometric sensing) are partially simulated due to browser-level hardware access limitations. Furthermore, full physical deployment of the QR Ground Truth anchors across the campus was not completed due to institutional administrative hurdles and physical scaling constraints. Consequently, the anchor-reset paradigm represents a validated architectural framework rather than a physically deployed infrastructure. Full real-world validation of both the sensor bridge and physical anchors remains critical future work.
 
@@ -623,15 +625,21 @@ Indoor localization components (WiFi fingerprinting and barometric sensing) are 
 
 ## 15. Installation & Setup
 
-1. `git clone https://github.com/your-username/smart-campus-nav.git`
+1. `git clone https://github.com/shivansh-kaushik/GAMEMNNIT.git`
 2. `npm install`
-3. Configure `.env` with `VITE_MAPBOX_TOKEN` and `VITE_OPENAI_API_KEY`.
+3. Configure `.env.local` with `VITE_MAPBOX_TOKEN` and `VITE_OPENAI_API_KEY`.
 4. `npm run dev`
 
-### 15.2 Reproducibility Package (Benchmarks)
-To verify benchmarks:
+### 15.2 Reproducibility Package
+To verify A* benchmarks:
 1. Run `import { benchmarkNavigation } from './src/benchmarks/AStarStressTest'`.
-2. Execute `benchmarkNavigation(100)` in the console to record Mean/SD for pathfinding.
+2. Execute `benchmarkNavigation(100)` in the browser console to record Mean/SD for pathfinding.
+
+To reproduce the localization simulation results:
+1. Ensure Python 3.x and `numpy` are installed.
+2. Run `python scripts/simulation_harness.py` from the project root.
+3. Results are exported to `docs/simulation_results.json` (N=100 trials per condition).
+4. Run `python scripts/confidence_cone_sim.py` to reproduce the Cone decision-suppression analysis (`docs/cone_results.json`).
 ---
 
 ## 16. Usage Guide
@@ -645,9 +653,11 @@ To verify benchmarks:
 
 - `/src/ar`: Marker localization and navigation logic.
 - `/src/components`: React components for UI and overlays.
-- `/src/navigation`: A* graph generation and pathfinding.
-- `/src/sensors`: Sensor bridge for GPS, Barometer, and WiFi.
-- `/src/three`: Digital twin environment and Voxel systems.
+- `/src/navigation`: A* graph generation, pathfinding, bearing, and directional utilities.
+- `/src/sensors`: Sensor bridge for GPS (with EMA smoothing), Barometer, and WiFi.
+- `/src/three`: 3D spatial model environment and Voxel systems.
+- `/scripts`: Python simulation harnesses (`simulation_harness.py`, `confidence_cone_sim.py`).
+- `/docs`: Evaluation summaries, simulation outputs, and screenshots.
 
 ---
 
@@ -741,7 +751,7 @@ An uncertainty-aware AR navigation system integrating a Geospatial Scene Graph (
 |------|------|
 | Pathfinding Latency | <20 ms |
 | AR Rendering | ~45 FPS |
-| Signal Stability | Significantly Improved |
+| DSLS+QR RMSE ($\sigma=20m$) | 15.60m vs 31.26m baseline (**50.1% reduction**) |
 
 ---
 
