@@ -70,21 +70,21 @@ const AROverlayScene: React.FC<{ waypoints: ARNavWaypoint[], sensors: ARSensors,
     
     return (
         <>
-            <DeviceOrientationControls />
-            <ambientLight intensity={0.5} />
+            {/* <DeviceOrientationControls />  -- Temporarily disabled to force "Forward" view for localhost test */}
+            <ambientLight intensity={1.0} />
             <pointLight position={[0, 2, 0]} intensity={2.0} />
             
             <group ref={groupRef} rotation={[0, THREE.MathUtils.degToRad(headingOffset), 0]}>
-                {/* 🚨 SLEDGEHAMMER TEST OBJECT (1 meter in front - UNDENIABLE) */}
+                {/* 🚨 SLEDGEHAMMER TEST OBJECT (1 meter in front - BASIC MATERIAL) */}
                 <mesh position={[0, 0, -1]}>
-                    <boxGeometry args={[0.5, 0.5, 0.5]} />
-                    <meshStandardMaterial color="#ff0000" emissive="#ff0000" emissiveIntensity={2} />
+                    <sphereGeometry args={[0.2, 32, 32]} />
+                    <meshBasicMaterial color="#ff0000" />
                 </mesh>
 
-                {/* 🚨 TEST OBJECT (Static North Reference - 5m away) */}
-                <mesh position={[0, -1, -5]}>
-                    <boxGeometry args={[0.5, 0.5, 0.5]} />
-                    <meshBasicMaterial color="#ef4444" wireframe />
+                {/* 🚨 TEST OBJECT (Static North Reference - 3m away) */}
+                <mesh position={[0, 0, -3]}>
+                    <boxGeometry args={[0.3, 0.3, 0.3]} />
+                    <meshBasicMaterial color="#00ff00" wireframe />
                 </mesh>
 
                 {/* Render Future Waypoints as Glowing Orbs */}
@@ -448,8 +448,8 @@ export const ARPage: React.FC<ARPageProps> = ({
             ) : (
                 <>
                     
-                    <div style={{ position: 'absolute', inset: 0, zIndex: 10, pointerEvents: 'none' }}>
-                        <Canvas gl={{ alpha: true, antialias: true }} camera={{ position: [0, 0, 0], fov: 70 }} style={{ pointerEvents: 'none' }}>
+                    <div style={{ position: 'absolute', top: 0, left: 0, width: '100vw', height: '100vh', zIndex: 10, pointerEvents: 'none' }}>
+                        <Canvas gl={{ alpha: true, antialias: true, premultipliedAlpha: false }} camera={{ position: [0, 0, 0], fov: 75, near: 0.1, far: 1000 }} style={{ pointerEvents: 'none', width: '100%', height: '100%' }}>
                             <AROverlayScene waypoints={waypoints} sensors={sensors} headingOffset={headingOffset} error={debugInfo.error} confidence={confidence} />
                         </Canvas>
                     </div>
@@ -662,6 +662,8 @@ export const ARPage: React.FC<ARPageProps> = ({
                     <div style={{ display: 'grid', gridTemplateColumns: '70px 1fr', gap: '3px' }}>
                         <span style={{ color: '#888' }}>3D:</span>
                         <span style={{ color: '#00ff88' }}>ACTIVE</span>
+                        <span style={{ color: '#888' }}>WP:</span>
+                        <span style={{ color: '#00ff88' }}>{waypoints.length}</span>
                         <span style={{ color: '#888' }}>Error:</span>
                         <span style={{ color: '#ef4444' }}>{debugInfo.error.toFixed(1)} m</span>
                         <span style={{ color: '#888' }}>Deviation:</span>
