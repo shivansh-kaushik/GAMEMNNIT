@@ -143,7 +143,7 @@ export const RealMap: React.FC<RealMapProps> = ({
 
     if (!token || token === 'YOUR_MAPBOX_ACCESS_TOKEN') {
         return (
-            <div style={{ width: '100vw', height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#111', color: 'red' }}>
+            <div style={{ width: '100vw', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#111', color: 'red' }}>
                 Please set VITE_MAPBOX_TOKEN in .env.local
             </div>
         );

@@ -6,10 +6,8 @@ import { RouteStep } from './components/ui/RouteCard';
 const VoxelCampus = lazy(() => import('./pages/VoxelCampus').then(m => ({ default: m.VoxelCampus })));
 const RealMap = lazy(() => import('./pages/RealMap').then(m => ({ default: m.RealMap })));
 const GPSTab = lazy(() => import('./pages/GPSTab').then(m => ({ default: m.GPSTab })));
-const WifiTab = lazy(() => import('./pages/WifiTab').then(m => ({ default: m.WifiTab }))); // Repurposed for Graph
-const ARPage = lazy(() => import('./pages/ARPage').then(m => ({ default: m.ARPage })));
+const PositioningPage = lazy(() => import('./pages/PositioningPage').then(m => ({ default: m.PositioningPage })));
 const ThesisTab = lazy(() => import('./pages/ThesisTab').then(m => ({ default: m.ThesisTab })));
-const LayoutToolTab = lazy(() => import('./pages/LayoutToolTab').then(m => ({ default: m.LayoutToolTab })));
 
 const App: React.FC = () => {
     const [activeTab, setActiveTab] = useState<TabId>('voxel');
@@ -46,13 +44,13 @@ const App: React.FC = () => {
             );
             case 'metrics': return (
                 <GPSTab 
-                    astarLatency={12.5} // Mock or real values from navigation engine
+                    astarLatency={12.5} 
                     crossTrackError={0.45}
                     gpsAccuracy={3.2}
                     coneAngle={24.5}
                 />
             );
-            case 'graph': return <LayoutToolTab />;
+            case 'graph': return <PositioningPage />;
             case 'ar': return (
                 <ARPage 
                     sharedPath={activePath} 
