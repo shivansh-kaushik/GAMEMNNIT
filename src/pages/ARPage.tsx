@@ -52,76 +52,96 @@ function getDistanceM(lat1: number, lon1: number, lat2: number, lon2: number) {
  * Handles rendering of Path Waypoints and the dynamic Confidence Cone.
  */
 const AROverlayScene: React.FC<{ waypoints: ARNavWaypoint[], sensors: ARSensors, headingOffset: number, error: number, confidence: string }> = ({ waypoints, sensors, headingOffset, error, confidence }) => {
-    const groupRef = useRef<THREE.Group>(null);
     const coneWrapperRef = useRef<THREE.Group>(null);
+    const arrowsRef = useRef<THREE.Group>(null);
 
-    useFrame(() => {
+    useFrame((state) => {
+        // Pulse animation for waypoint orbs
+        const t = state.clock.getElapsedTime();
+        if (arrowsRef.current) {
+            arrowsRef.current.children.forEach((child, i) => {
+                child.scale.setScalar(1 + 0.08 * Math.sin(t * 2 + i * 0.5));
+            });
+        }
+        // Cone always points to next waypoint
         if (coneWrapperRef.current && waypoints.length > 0) {
             const nextWP = waypoints[Math.min(1, waypoints.length - 1)];
-            // Group looks at target
             coneWrapperRef.current.lookAt(nextWP.x, -1.0, -nextWP.z);
         }
     });
 
-    // Thesis: Confidence Cone parameters (theta bounds driven by uncertainty)
-    const baseRadius = 0.5;
-    const dynamicSpread = Math.max(0.1, error * 0.5); 
-    const coneOpacity = Math.max(0.2, 0.9 - (error * 0.04)); 
-    
+    // Confidence Cone: spread grows with GPS error
+    const baseRadius = 0.3;
+    const dynamicSpread = Math.max(0.05, error * 0.4);
+    const coneOpacity = Math.max(0.15, 0.7 - error * 0.035);
+    const coneColor = confidence === 'Recalculating' ? '#ef4444' : confidence === 'Slightly Off' ? '#eab308' : '#00ff88';
+
     return (
         <>
-            {/* <DeviceOrientationControls />  -- Temporarily disabled to force "Forward" view for localhost test */}
-            <ambientLight intensity={1.0} />
-            <pointLight position={[0, 2, 0]} intensity={2.0} />
-            
-            <group ref={groupRef} rotation={[0, THREE.MathUtils.degToRad(headingOffset), 0]}>
-                {/* 🚨 SLEDGEHAMMER TEST OBJECT (1 meter in front - BASIC MATERIAL) */}
-                <mesh position={[0, 0, -1]}>
-                    <sphereGeometry args={[0.2, 32, 32]} />
-                    <meshBasicMaterial color="#ff0000" />
-                </mesh>
+            <DeviceOrientationControls />
+            <ambientLight intensity={0.6} />
+            <pointLight position={[0, 3, 0]} intensity={1.5} color="#ffffff" />
 
-                {/* 🚨 TEST OBJECT (Static North Reference - 3m away) */}
-                <mesh position={[0, 0, -3]}>
-                    <boxGeometry args={[0.3, 0.3, 0.3]} />
-                    <meshBasicMaterial color="#00ff00" wireframe />
-                </mesh>
-
-                {/* Render Future Waypoints as Glowing Orbs */}
-                {waypoints.slice(0, 8).map((wp, i) => {
-                    const scale = Math.max(0.8, 2.5 - i * 0.3);
+            {/* Navigation waypoint orbs — user is always at origin (0,0,0) */}
+            <group ref={arrowsRef}>
+                {waypoints.slice(0, 6).map((wp, i) => {
+                    // Clamp to max 30m visual range so orbs are always visible on screen
+                    const maxRange = 30;
+                    const dist = Math.sqrt(wp.x * wp.x + wp.z * wp.z);
+                    const scale_factor = dist > maxRange ? maxRange / dist : 1;
+                    const px = wp.x * scale_factor;
+                    const pz = wp.z * scale_factor;
+                    const radius = Math.max(0.15, 0.6 - i * 0.07);
+                    const isLast = i === waypoints.length - 1;
+                    const color = isLast ? '#ef4444' : '#00ff88';
                     return (
-                        <mesh key={i} position={[wp.x, -1.0, -wp.z]}>
-                            <sphereGeometry args={[scale, 24, 24]} />
-                            <meshStandardMaterial 
-                                color={i === waypoints.length - 1 ? "#ef4444" : "#00ff88"} 
-                                transparent opacity={0.9 - i * 0.1} 
-                                emissive={i === waypoints.length - 1 ? "#ef4444" : "#00ff88"}
-                                emissiveIntensity={0.8}
+                        <mesh key={i} position={[px, -0.5 - i * 0.15, -pz]}>
+                            <sphereGeometry args={[radius, 20, 20]} />
+                            <meshStandardMaterial
+                                color={color}
+                                emissive={color}
+                                emissiveIntensity={1.2}
+                                transparent
+                                opacity={0.9 - i * 0.08}
                             />
                         </mesh>
                     );
                 })}
-
-                {/* The Confidence Cone (Uncertainty-Gated Perception) */}
-                {waypoints.length > 0 && (
-                    <group ref={coneWrapperRef} position={[0, -1, 0]}>
-                        <mesh rotation={[Math.PI / 2, 0, 0]}>
-                            <cylinderGeometry args={[dynamicSpread, baseRadius, 10, 32]} />
-                            <meshBasicMaterial 
-                                color={confidence === 'Recalculating' ? "#ef4444" : confidence === 'Slightly Off' ? "#eab308" : "#00ff88"}
-                                transparent 
-                                opacity={coneOpacity} 
-                                blending={THREE.AdditiveBlending} 
-                                depthWrite={false}
-                            />
-                        </mesh>
-                    </group>
-                )}
             </group>
+
+            {/* Floating navigation arrow cone — points to next waypoint */}
+            {waypoints.length > 0 && (
+                <group ref={coneWrapperRef} position={[0, 0, 0]}>
+                    {/* Arrow shaft */}
+                    <mesh rotation={[Math.PI / 2, 0, 0]} position={[0, 0, -1.5]}>
+                        <cylinderGeometry args={[0.02, 0.02, 1.5, 16]} />
+                        <meshBasicMaterial color={coneColor} />
+                    </mesh>
+                    {/* Arrow tip */}
+                    <mesh rotation={[Math.PI / 2, 0, 0]} position={[0, 0, -2.4]}>
+                        <coneGeometry args={[0.1, 0.3, 16]} />
+                        <meshBasicMaterial color={coneColor} />
+                    </mesh>
+                    {/* Confidence Cone glow (Uncertainty-Gated Perception) */}
+                    <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, -1]}>
+                        <coneGeometry args={[dynamicSpread, 2.0, 32, 1, true]} />
+                        <meshBasicMaterial
+                            color={coneColor}
+                            transparent
+                            opacity={coneOpacity}
+                            blending={THREE.AdditiveBlending}
+                            depthWrite={false}
+                            side={THREE.DoubleSide}
+                        />
+                    </mesh>
+                </group>
+            )}
         </>
     );
 };
+
+// Stub to keep linter happy — removed old ARNavWaypoint fields
+const _SENSOR_UNUSED = (s: ARSensors) => s;
 
 interface ARPageProps {
     sharedPath: string[];
