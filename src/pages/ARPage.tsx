@@ -469,7 +469,16 @@ export const ARPage: React.FC<ARPageProps> = ({
                 <>
                     
                     <div style={{ position: 'absolute', top: 0, left: 0, width: '100vw', height: '100vh', zIndex: 10, pointerEvents: 'none' }}>
-                        <Canvas gl={{ alpha: true, antialias: true, premultipliedAlpha: false }} camera={{ position: [0, 0, 0], fov: 75, near: 0.1, far: 1000 }} style={{ pointerEvents: 'none', width: '100%', height: '100%' }}>
+                        <Canvas
+                            gl={{ alpha: true, antialias: true, premultipliedAlpha: false }}
+                            camera={{ position: [0, 0, 0], fov: 75, near: 0.1, far: 1000 }}
+                            style={{ pointerEvents: 'none', width: '100%', height: '100%', background: 'transparent' }}
+                            onCreated={({ gl, scene }) => {
+                                gl.setClearColor(0x000000, 0); // fully transparent clear
+                                gl.setPixelRatio(window.devicePixelRatio);
+                                scene.background = null;
+                            }}
+                        >
                             <AROverlayScene waypoints={waypoints} sensors={sensors} headingOffset={headingOffset} error={debugInfo.error} confidence={confidence} />
                         </Canvas>
                     </div>
