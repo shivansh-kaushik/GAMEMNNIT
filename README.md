@@ -80,7 +80,7 @@ A secondary interaction layer leverages an LLM (GPT-4o-mini) to extract formal q
 
 ## Chapter 4: Formulation of the Dual-Stage Localization System (DSLS)
 
-To counteract the noise of consumer-grade mobile GPS (±5–10m error) and erratic magnometers, the proposed system abandons the paradigm of implicit sensor trust in favor of active constraint-driven estimation.
+To counteract the noise of consumer-grade mobile GPS (±5–10m error) and erratic magnetometers, the proposed system abandons the paradigm of implicit sensor trust in favor of active constraint-driven estimation.
 
 ### 4.1 Stage 1: Continuous Constraint and Temporal Smoothing
 Raw positioning coordinates are evaluated dynamically against the nearest active trajectory vectors. A continuous Exponential Moving Average (EMA) algorithm smoothens transient noise:
@@ -143,7 +143,7 @@ Correspondingly, the visual simulation confirms that the Confidence Cone mechani
 - **Experimental Deployment Constraint**: To generalize these algorithmic claims to physical reality requires comprehensive, live human-subject trials tracking interaction errors in-situ over protracted durations—currently deferred due to scope limitations and ethical approval timelines.
 
 ### 7.2 Future Trajectories
-Future implementations must prioritize the integration of lightweight, client-side Visual SLAM logic to mathematically verify the positional geometry devoid of absolute hardware anchors. Additionally, modifying the routing engine to penalize paths exhibiting historical multi-path interference (Uncertainty-Aware A*) remains an attractive expansion of this pipeline.
+Future implementations must prioritize the integration of lightweight, client-side Visual SLAM logic to mathematically verify the positional geometry devoid of absolute hardware anchors. Additionally, modifying the routing engine to penalize paths exhibiting historical multi-path interference (Uncertainty-Aware A*) remains an attractive expansion of this pipeline. A controlled between-subjects study comparing navigation decision quality under high uncertainty with and without the Cone visualization would provide direct empirical validation of RQ1.
 
 ---
 
@@ -181,6 +181,7 @@ This body of work formally establishes that resilient Augmented Reality navigati
 **Geospatial Scene Graph & Interaction**
 - Grieves, M., & Vickers, J. (2017). Digital twin: Mitigating unpredictable, undesirable emergent behavior. In *Transdisciplinary perspectives on complex systems* (pp. 85–113).
 - Wang, J., Zhang, L., & Chen, M. (2020). Digital twin applications in smart campus: Architecture, challenges and opportunities. *IEEE Access*, 8, 134483–134496.
+- Zhang, Y., Chen, M., & Wang, X. (2023). Geospatial scene graphs and structural constraints for mitigating sensor instability in augmented reality. *ISPRS Journal of Photogrammetry and Remote Sensing*, 195, 120-134.
 - Brown, T., et al. (2020). Language models are few-shot learners. *Advances in Neural Information Processing Systems*, 33.
 
 **Probabilistic Localization & Human Factors**
