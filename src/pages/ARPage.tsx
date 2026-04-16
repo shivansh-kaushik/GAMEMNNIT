@@ -6,12 +6,11 @@ import logger from '../utils/logger';
 import { AIAssistantPanel } from '../ai/AIAssistantPanel'; // AI layer — does not touch AR logic
 import { useHeadingSmoothing } from '../hooks/useHeadingSmoothing';
 import { useNavigationConfidence } from '../hooks/useNavigationConfidence';
+import { useVoiceGuidance } from '../hooks/useVoiceGuidance';
 import { MiniMapOverlay } from '../components/MiniMapOverlay';
 import { FloorIndicator } from '../components/FloorIndicator';
-import { calibrateFloor, useFloorDetection } from '../sensors/floorDetection';
-import { CameraHintOverlay } from '../ai/CameraHintOverlay';
-import { ARHud } from '../components/ui/ARHud';
-import { ARInstructionCard } from '../components/ui/ARInstructionCard';
+import { calibrateFloor } from '../sensors/floorDetection';
+
 
 
 import { MapView } from '../components/MapView';
@@ -48,15 +47,13 @@ interface ARPageProps {
     sharedDestinationId: string | null;
     onArStop: () => void;
     onDestinationChange: (id: string | null) => void;
-    isActive?: boolean;
 }
 
 export const ARPage: React.FC<ARPageProps> = ({ 
     sharedPath, 
     sharedDestinationId, 
     onArStop,
-    onDestinationChange,
-    isActive = false
+    onDestinationChange
 }) => {
     const isMobile = window.innerWidth < 768;
     const videoRef = useRef<HTMLVideoElement>(null);
@@ -73,10 +70,39 @@ export const ARPage: React.FC<ARPageProps> = ({
     const [isLogging, setIsLogging] = useState(false);
     const [headingOffset, setHeadingOffset] = useState(0);
 
+    // Sync global destination state with local state
+    useEffect(() => {
+        if (sharedDestinationId) {
+            setDestId(sharedDestinationId);
+        }
+    }, [sharedDestinationId]);
+
     const [debugMode, setDebugMode] = useState(false);
     const [activeGraphPath, setActiveGraphPath] = useState<string[]>([]);
     const [pathMetrics, setPathMetrics] = useState({ length: 0, time: 0 });
     const graph = React.useMemo(() => buildGraphFromGeoJSON(pathData), []);
+
+    // Calculate A* Path on target change (for Map Preview & comparison)
+    useEffect(() => {
+        const targetId = pendingDestId || destId;
+        if (!targetId || !sensors?.gpsLat || !sensors?.gpsLon) return;
+
+        const startTime = performance.now();
+        const startVoxel = latLngToVoxel(sensors.gpsLat, sensors.gpsLon);
+        const startNode = findNearestGraphNode(startVoxel[0], startVoxel[2], graph.nodes);
+        
+        const destB = CAMPUS_BUILDINGS.find(b => b.id === targetId);
+        
+        if (startNode && destB) {
+            const destVoxel = latLngToVoxel(destB.latitude, destB.longitude);
+            const destNode = findNearestGraphNode(destVoxel[0], destVoxel[2], graph.nodes);
+            if (destNode) {
+                const path = aStar(startNode, destNode, graph.nodes, graph.edges);
+                setActiveGraphPath(path);
+                setPathMetrics({ length: path.length, time: performance.now() - startTime });
+            }
+        }
+    }, [pendingDestId, destId, sensors?.gpsLat, sensors?.gpsLon, graph]);
 
     // Smart features state
     const [debugInfo, setDebugInfo] = useState({ error: 0, deviation: 0, nextTurn: 'Straight' });
@@ -95,65 +121,18 @@ export const ARPage: React.FC<ARPageProps> = ({
     const [gtAnchorUI, setGtAnchorUI] = useState<{active: boolean, id: string}>({ active: false, id: '' });
     const gtOffsetRef = useRef({ lat: 0, lon: 0 });
 
-    const destIdRef = useRef<string | null>(null);
-    const pathDestRef = useRef<string | null>(null);
-
-    useEffect(() => { destIdRef.current = destId; }, [destId]);
-
-    // 0. Sync Shared Destination (State Persistence)
-    useEffect(() => {
-        if (sharedDestinationId) {
-            setDestId(sharedDestinationId);
-        }
-    }, [sharedDestinationId]);
-
-    // 1. Consume Shared Path (Planning -> Execution)
-    useEffect(() => {
-        if (!sensors || !sensors.gpsLat || !sensors.gpsLon) return;
-
-        let activePath = sharedPath;
-        
-        // If QuickSelect was used, Map didn't generate a path. We generate fallback here:
-        if (activePath.length === 0 && destId) {
-            const destB = CAMPUS_BUILDINGS.find(b => b.id === destId);
-            if (destB) {
-                const [sx, sy, sz] = latLngToVoxel(sensors.gpsLat, sensors.gpsLon);
-                const [dx, dy, dz] = latLngToVoxel(destB.latitude, destB.longitude);
-                const sNode = findNearestGraphNode(sx, sz, graph.nodes);
-                const dNode = findNearestGraphNode(dx, dz, graph.nodes);
-                if (sNode && dNode) {
-                    activePath = aStar(sNode, dNode, graph.nodes, graph.edges);
-                }
-            }
-        }
-
-        if (activePath.length === 0) return;
-
-        // Convert Node IDs to AR Waypoints (Map -> AR coordinate space transformation)
-        const pathWaypoints: ARNavWaypoint[] = activePath.map((id, i) => {
-            const node = graph.nodes[id];
-            if (!node) return null;
-            return {
-                ...gpsToARWorld(node.lat, node.lng, sensors.gpsLat!, sensors.gpsLon!),
-                gpsLat: node.lat,
-                gpsLon: node.lng,
-                distFromPrev: 0,
-                totalDist: 0,
-                label: i === activePath.length - 1 ? "Target" : undefined
-            };
-        }).filter(wp => wp !== null) as ARNavWaypoint[];
-
-        setWaypoints(pathWaypoints);
-        waypointsRef.current = pathWaypoints;
-    }, [sharedPath, destId, sensors?.gpsLat, sensors?.gpsLon, graph]);
-
     const startLogging = () => { setIsLogging(true); isLoggingRef.current = true; };
     const stopLogging = () => { setIsLogging(false); isLoggingRef.current = false; };
     const downloadLogs = () => logger.download();
 
     const smoothedHeading = useHeadingSmoothing(sensors?.compassBearing ?? 0, 0.15, 150);
     const confidence = useNavigationConfidence(sensors?.gpsLat ?? 0, sensors?.gpsLon ?? 0, destId);
-    const { floor } = useFloorDetection();
+
+    // Voice guidance integration
+    const distanceToNextTurn = waypoints.length > 0 ? waypoints[0].distFromPrev : 0;
+    const isFinalDest = waypoints.length <= 1;
+    const turnInstruction = waypoints.length > 0 ? (waypoints[0].label || "Continue straight") : "";
+    useVoiceGuidance(distanceToNextTurn, turnInstruction, isFinalDest);
 
     // ---------- Camera ----------
     const startCamera = useCallback(async () => {
@@ -178,14 +157,8 @@ export const ARPage: React.FC<ARPageProps> = ({
         if (videoRef.current) videoRef.current.srcObject = null;
         if (animRef.current) cancelAnimationFrame(animRef.current);
         setArActive(false);
-        onArStop(); // Notify App to clear navigation intent on exit
+        onArStop();
     }, [onArStop]);
-
-    // 0. Camera Lifecycle
-    useEffect(() => {
-        startCamera();
-        return () => stopCamera();
-    }, [startCamera, stopCamera]);
 
     // ---------- Sensor polling ----------
     useEffect(() => {
@@ -228,15 +201,6 @@ export const ARPage: React.FC<ARPageProps> = ({
 
                 const deviation = snapped.crossTrackError;
 
-                // 0. Off-Route Recalibration
-                if (deviation > 25 && destIdRef.current) {
-                    console.log(`High deviation (${deviation.toFixed(1)}m). Recalculating path...`);
-                    const newWp = buildARPath(s.gpsLat, s.gpsLon, destIdRef.current, 5);
-                    setWaypoints(newWp);
-                    waypointsRef.current = newWp;
-                    prevSnapRef.current = null;
-                }
-
                 // Next waypoint for calculations
                 const nextWP = waypointsRef.current[Math.min(1, waypointsRef.current.length - 1)];
 
@@ -245,8 +209,6 @@ export const ARPage: React.FC<ARPageProps> = ({
                 for (const e of ENTRANCES) {
                     if (getDistanceM(s.gpsLat, s.gpsLon, e.lat, e.lon) < 10) {
                         foundEnt = e.name;
-                        // AUTOMATED RESET: Snap floor to Ground (0) when entering a building
-                        calibrateFloor(0); 
                         break;
                     }
                 }
@@ -314,30 +276,59 @@ export const ARPage: React.FC<ARPageProps> = ({
         const msg = new SpeechSynthesisUtterance('Ground truth established.');
         window.speechSynthesis.speak(msg);
 
-        // STABILIZATION: Reset floor baseline on QR scan (use payload floor or default to Ground/0)
-        calibrateFloor(payload.floor !== undefined ? payload.floor : 0);
+        // STABILIZATION: Reset floor baseline on QR scan (assuming current floor is G/0 if not specified)
+        calibrateFloor(0);
     }, [sensors]);
 
     // Note: Passive background scanning (markerScannerRef) is intentionally REMOVED.
     // WebXR camera lock makes passive scanning unreliable on most devices.
     // The dedicated Scan Mode (QRScanOverlay) guarantees full camera access.
 
-    // ---------- Build waypoints when destination changes ----------
+    // ---------- Build waypoints when destination/path changes ----------
     useEffect(() => {
-        if (!destId || !sensors || !sensors.gpsLat || !sensors.gpsLon) return;
+        if (!destId || !sensors?.gpsLat || !sensors?.gpsLon) return;
+
+        let activePath = sharedPath || [];
         
-        // Prevent regenerating unless the destination actually changed
-        if (pathDestRef.current !== destId) {
-            const wp = buildARPath(sensors.gpsLat, sensors.gpsLon, destId, 5);
-            setWaypoints(wp);
-            waypointsRef.current = wp;
-            pathDestRef.current = destId;
-            prevSnapRef.current = null; // Clear snapping filter history on new route
+        // If QuickSelect was used, we generate the graph path locally here:
+        if (activePath.length === 0) {
+            const destB = CAMPUS_BUILDINGS.find(b => b.id === destId);
+            if (destB) {
+                const [sx, sy, sz] = latLngToVoxel(sensors.gpsLat, sensors.gpsLon);
+                const [dx, dy, dz] = latLngToVoxel(destB.latitude, destB.longitude);
+                const sNode = findNearestGraphNode(sx, sz, graph.nodes);
+                const dNode = findNearestGraphNode(dx, dz, graph.nodes);
+                if (sNode && dNode) {
+                    activePath = aStar(sNode, dNode, graph.nodes, graph.edges);
+                }
+            }
         }
 
-        // Keep distance indicator updated without flushing the track
+        if (activePath.length > 0) {
+            const pathWaypoints: ARNavWaypoint[] = activePath.map((id, i) => {
+                const node = graph.nodes[id];
+                if (!node) return null;
+                return {
+                    ...gpsToARWorld(node.lat, node.lng, sensors.gpsLat!, sensors.gpsLon!),
+                    gpsLat: node.lat,
+                    gpsLon: node.lng,
+                    distFromPrev: 0,
+                    totalDist: 0,
+                    label: i === activePath.length - 1 ? "Target" : undefined
+                };
+            }).filter(wp => wp !== null) as ARNavWaypoint[];
+            setWaypoints(pathWaypoints);
+            waypointsRef.current = pathWaypoints;
+            setDistanceLeft(remainingDistance(sensors.gpsLat, sensors.gpsLon, destId));
+            return;
+        }
+
+        // Ultimate fallback to basic waypoint engine
+        const wp = buildARPath(sensors.gpsLat, sensors.gpsLon, destId, 5);
+        setWaypoints(wp);
+        waypointsRef.current = wp;
         setDistanceLeft(remainingDistance(sensors.gpsLat, sensors.gpsLon, destId));
-    }, [destId, sensors]);
+    }, [sharedPath, destId, sensors?.gpsLat, sensors?.gpsLon, graph]);
 
     // ---------- Canvas AR overlay ----------
     useEffect(() => {
@@ -477,7 +468,7 @@ export const ARPage: React.FC<ARPageProps> = ({
 
     // ---------- UI ----------
     return (
-        <div className="ar-camera-container">
+        <div style={{ width: '100vw', height: '100vh', background: '#000', position: 'relative', overflow: 'hidden' }}>
             {/* Dedicated QR Scan Mode — fullscreen, independent camera, guaranteed detection */}
             {scanMode && (
                 <QRScanOverlay
@@ -485,84 +476,257 @@ export const ARPage: React.FC<ARPageProps> = ({
                     onCancel={() => setScanMode(false)}
                 />
             )}
+            {/* Camera feed */}
             <video
                 ref={videoRef}
-                className="w-full h-full object-cover"
+                style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover' }}
                 playsInline
                 muted
                 autoPlay
             />
-            <canvas
-                ref={canvasRef}
-                className="absolute inset-0 z-10 w-full h-full pointer-events-none"
-            />
+            {/* Distance-Aware UI Transition */}
+            {arActive && distanceLeft && distanceLeft > 5000 ? (
+                <div style={{ position: 'absolute', inset: 0, zIndex: 5, background: 'transparent' }}>
+                    {/* Full map representation for far distances */}
+                    {sensors && <MiniMapOverlay lat={sensors.gpsLat} lon={sensors.gpsLon} destLat={CAMPUS_BUILDINGS.find(b => b.id === destId)?.latitude} destLon={CAMPUS_BUILDINGS.find(b => b.id === destId)?.longitude} waypoints={waypoints} trajectory={trajectory} />}
+                    <div style={{ position: 'absolute', bottom: '120px', width: '100%', textAlign: 'center', color: '#fff', fontSize: '18px', fontWeight: 'bold', textShadow: '0 2px 4px rgba(0,0,0,0.8)' }}>
+                        Follow the Map. AR will activate within 100m.
+                    </div>
+                </div>
+            ) : (
+                <>
+                    {/* AR Canvas overlay */}
+                    <canvas
+                        ref={canvasRef}
+                        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none' }}
+                    />
+                    {/* Floating Mini Map Overlay for close distances */}
+                    {arActive && sensors && (
+                        <MiniMapOverlay lat={sensors.gpsLat} lon={sensors.gpsLon} destLat={destId ? CAMPUS_BUILDINGS.find(b => b.id === destId)?.latitude : undefined} destLon={destId ? CAMPUS_BUILDINGS.find(b => b.id === destId)?.longitude : undefined} waypoints={waypoints} trajectory={trajectory} />
+                    )}
+                </>
+            )}
 
-            {/* Production HUD Overlay */}
+            {/* Top Controls */}
+            <div style={{ position: 'absolute', top: isMobile ? '10px' : '20px', left: '50%', transform: 'translateX(-50%)', zIndex: 10, display: 'flex', gap: isMobile ? '6px' : '12px', alignItems: 'center', zoom: isMobile ? 0.8 : 1 }}>
+                {!arActive ? (
+                    <button onClick={startCamera} style={btnStyle('#00ff88', '#000')}>
+                        📷 Start AR Navigation
+                    </button>
+                ) : (
+                    <>
+                        <button onClick={stopCamera} style={btnStyle('#ef4444', '#fff')}>⏹ Stop</button>
+                        {!isLogging ? (
+                            <button onClick={startLogging} style={btnStyle('#3b82f6', '#fff')}>⚫ Start Log</button>
+                        ) : (
+                            <button onClick={stopLogging} style={btnStyle('#f59e0b', '#fff')}>🟠 Stop Log</button>
+                        )}
+                        {!isMobile && <button onClick={downloadLogs} style={btnStyle('#8b5cf6', '#fff')}>⬇ Download</button>}
+                    </>
+                )}
+            </div>
+
+            {/* Destination Picker */}
+            {arActive && !destId && (
+                <div style={{ position: 'absolute', top: '75px', left: '50%', transform: 'translateX(-50%)', zIndex: 10, background: 'rgba(0,0,0,0.75)', padding: '12px 16px', borderRadius: '10px', border: '1px solid #333', minWidth: '260px' }}>
+                    <div style={{ color: '#aaa', fontSize: '11px', marginBottom: '6px', textTransform: 'uppercase' }}>Navigate to</div>
+                    <select
+                        value={pendingDestId || ''}
+                        onChange={e => setPendingDestId(e.target.value || null)}
+                        style={{ width: '100%', background: '#111', color: '#fff', border: '1px solid #444', borderRadius: '6px', padding: '8px', fontSize: '13px', cursor: 'pointer' }}
+                    >
+                        <option value=''>— Select Destination —</option>
+                        {CAMPUS_BUILDINGS.map(b => (
+                            <option key={b.id} value={b.id}>
+                                {b.name}{b.isIndoor ? ` (Floor ${b.floor ?? 0})` : ''}
+                            </option>
+                        ))}
+                    </select>
+                </div>
+            )}
+
+            {/* Destination Confirmation Modal & Map Preview */}
+            {arActive && pendingDestId && !destId && (
+                <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.92)', zIndex: 50, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start', overflowY: 'auto', paddingTop: '20px', paddingBottom: '80px' }}>
+                    <h3 style={{ color: '#fff', margin: '0 0 16px 0', fontSize: '20px' }}>Path Preview</h3>
+                    
+                    {/* Visual Comparison Map layer */}
+                    <div style={{ position: 'relative', width: '90%', maxWidth: '600px', height: '40vh', marginBottom: '20px' }}>
+                        <MapView 
+                            graph={graph} 
+                            activePath={activeGraphPath} 
+                            width={window.innerWidth * 0.9 > 600 ? 600 : window.innerWidth * 0.9} 
+                            height={window.innerHeight * 0.4} 
+                            userLat={sensors?.gpsLat}
+                            userLon={sensors?.gpsLon}
+                            debugMode={debugMode}
+                        />
+                        <GraphDebugToggle active={debugMode} onToggle={() => setDebugMode(!debugMode)} />
+                    </div>
+
+                    <div style={{ marginBottom: '24px', width: '90%', maxWidth: '400px' }}>
+                        <ComparisonPanel 
+                            totalNodes={Object.keys(graph.nodes).length}
+                            totalEdges={Object.values(graph.edges).reduce((acc, e) => acc + e.length, 0)}
+                            pathLength={pathMetrics.length}
+                            executionTimeMs={pathMetrics.time}
+                        />
+                    </div>
+
+                    <div style={{ background: '#1a1a1a', padding: '20px', borderRadius: '16px', width: '90%', maxWidth: '400px', textAlign: 'center', border: '1px solid #333' }}>
+                        <p style={{ color: '#aaa', fontSize: '14px', marginBottom: '16px', marginTop: 0 }}>
+                            Navigate to <strong>{CAMPUS_BUILDINGS.find(b => b.id === pendingDestId)?.name}</strong>?
+                        </p>
+                        <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
+                            <button onClick={() => setPendingDestId(null)} style={btnStyle('#333', '#fff')}>Cancel</button>
+                            <button onClick={() => { 
+                                setDestId(pendingDestId); 
+                                onDestinationChange(pendingDestId);
+                                setPendingDestId(null); 
+                            }} style={btnStyle('#00ff88', '#000')}>Start AR Mode</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Compass Calibration Button */}
             {arActive && (
-                <ARHud 
-                    gpsAccuracy={sensors?.gpsAccuracy || 0}
-                    coneAngleDeg={25} 
-                    floorNumber={floor}
-                    compassHeading={sensors?.compassBearing || 0}
-                />
+                <button 
+                    onClick={() => {
+                        alert("Move phone in a figure-8 motion to calibrate the compass.");
+                        if (sensors) setHeadingOffset(-sensors.compassBearing);
+                    }} 
+                    style={{ position: 'absolute', bottom: '20px', right: '20px', background: 'rgba(0,0,0,0.6)', border: '1px solid #444', color: '#fff', padding: '10px', borderRadius: '50%', cursor: 'pointer', zIndex: 10 }}
+                    title="Calibrate Compass"
+                >
+                    🧭
+                </button>
             )}
 
-            {/* Production Instruction Card */}
-            {arActive && turnMessage && (
-                <ARInstructionCard 
-                    direction={turnMessage} 
-                    distanceMeters={Math.round(distanceLeft || 0)} 
-                />
-            )}
-
-            {/* Error States */}
+            {/* Camera error */}
             {cameraError && (
-                <div className="absolute inset-0 flex items-center justify-center bg-black/90 z-50 p-10 text-center text-red-500 font-bold">
+                <div style={{ position: 'absolute', bottom: '100px', left: '50%', transform: 'translateX(-50%)', background: 'rgba(239,68,68,0.9)', color: '#fff', padding: '12px 20px', borderRadius: '8px', fontSize: '13px', maxWidth: '90%', textAlign: 'center' }}>
                     ⚠ {cameraError}
                 </div>
             )}
-            
-            {!destId && (
-                <div className="absolute top-24 left-1/2 -translate-x-1/2 z-40 flex flex-col items-center gap-4 w-full px-6 pointer-events-auto">
-                    <div className="px-4 py-2 glass rounded-full border border-white/5 flex items-center gap-2 shadow-2xl">
-                        <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
-                        <span className="text-[10px] font-black uppercase tracking-widest text-white">Select Destination in AR</span>
-                    </div>
 
-                    <div className="flex gap-2 overflow-x-auto pb-2 w-full max-w-sm scrollbar-none justify-center">
-                        {[
-                            { id: 'mnnit_lib', name: 'Library', icon: '📚' },
-                            { id: 'mnnit_cse', name: 'CSE Bldg', icon: '💻' },
-                            { id: 'mnnit_admin', name: 'Admin', icon: '🏛️' }
-                        ].map(b => (
-                            <button
-                                key={b.id}
-                                onClick={() => onDestinationChange(b.id)}
-                                className="whitespace-nowrap flex items-center gap-2 px-4 py-2 bg-black/60 backdrop-blur-xl border border-white/10 rounded-2xl text-[11px] font-black uppercase tracking-tighter text-white hover:bg-blue-600 transition-all active:scale-95 shadow-lg"
-                            >
-                                <span>{b.icon}</span>
-                                <span>{b.name}</span>
-                            </button>
-                        ))}
+            {/* Idle placeholder */}
+            {!arActive && !cameraError && (
+                <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '16px' }}>
+                    <div style={{ fontSize: '64px' }}>📷</div>
+                    <div style={{ color: '#fff', fontSize: '20px', fontWeight: 'bold' }}>AR Navigation Mode</div>
+                    <div style={{ color: '#aaa', fontSize: '13px', textAlign: 'center', maxWidth: '300px' }}>
+                        Press "Start AR Navigation" to open your camera and overlay turn-by-turn AR directions.
+                    </div>
+                    <div style={{ color: '#555', fontSize: '11px', marginTop: '8px' }}>
+                        Uses GPS · Compass · Gyroscope · A* Pathfinding · 🤖 AI Voice Assistant
                     </div>
                 </div>
             )}
 
-            {/* ─── Layers — Protected Logic ───────────────────── */}
+            {/* Smart Navigation Overlays */}
+            {arActive && (
+                <div style={{ position: 'absolute', top: '25%', left: '50%', transform: 'translateX(-50%)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', zIndex: 11, zoom: isMobile ? 0.75 : 1 }}>
+                    {turnMessage && (
+                        <div style={{ background: 'rgba(59, 130, 246, 0.9)', color: '#fff', padding: isMobile ? '8px 16px' : '12px 24px', borderRadius: '30px', fontWeight: 'bold', fontSize: isMobile ? '14px' : '18px', boxShadow: '0 4px 15px rgba(0,0,0,0.5)', border: '2px solid rgba(255,255,255,0.7)' }}>
+                            {turnMessage}
+                        </div>
+                    )}
+                    {entranceWarning && (
+                        <div style={{ background: 'rgba(16, 185, 129, 0.9)', color: '#fff', padding: isMobile ? '6px 12px' : '10px 20px', borderRadius: '12px', fontWeight: 'bold', fontSize: isMobile ? '12px' : '16px', border: '2px solid rgba(255,255,255,0.5)' }}>
+                            {entranceWarning}
+                        </div>
+                    )}
+                    {pathWarning && (
+                        <div style={{ background: 'rgba(239, 68, 68, 0.9)', color: '#fff', padding: isMobile ? '6px 12px' : '10px 20px', borderRadius: '12px', fontWeight: 'bold', fontSize: isMobile ? '12px' : '16px', border: '2px solid rgba(255,255,255,0.5)', animation: 'pulse 1s infinite' }}>
+                            {pathWarning}
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* Live Location & Dev Debug */}
+            {arActive && sensors && sensors.gpsLat !== null && (
+                <div style={{ position: 'absolute', bottom: isMobile ? '55px' : '70px', left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: '6px', zIndex: 10, zoom: isMobile ? 0.8 : 1, flexWrap: 'wrap', justifyContent: 'center', width: '90%' }}>
+                    <div style={{ background: 'rgba(0,0,0,0.6)', color: '#00ff88', padding: '6px 10px', borderRadius: '12px', fontSize: isMobile ? '10px' : '11px', fontWeight: 'bold', border: '1px solid #00ff8833' }}>
+                        📍 {sensors.gpsLat.toFixed(4)}°N, {sensors.gpsLon.toFixed(4)}°E
+                    </div>
+                    {destId && !gtAnchorUI.active && (
+                        <div style={{ background: snapUI.isLocked ? 'rgba(16, 185, 129, 0.9)' : 'rgba(245, 158, 11, 0.9)', color: '#fff', padding: '6px 12px', borderRadius: '12px', fontSize: '11px', fontWeight: 'bold', border: '1px solid rgba(255,255,255,0.4)', transition: 'background 0.3s' }}>
+                            {snapUI.isLocked ? `🔒 Path Locked (${(snapUI.confidence * 100).toFixed(0)}%)` : '🔄 Reacquiring Route...'}
+                        </div>
+                    )}
+                    {gtAnchorUI.active && (
+                        <div style={{ background: 'rgba(139, 92, 246, 0.9)', color: '#fff', padding: '6px 12px', borderRadius: '12px', fontSize: '11px', fontWeight: 'bold', border: '1px solid rgba(255,255,255,0.8)', animation: 'pulse 2s infinite' }}>
+                            🎯 Ground Truth Anchor: {gtAnchorUI.id}
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* QR Scan Trigger Button */}
+            {arActive && destId && (
+                <button
+                    onClick={() => setScanMode(true)}
+                    style={{
+                        position: 'absolute', bottom: '20px', right: '16px', zIndex: 15,
+                        background: 'rgba(139, 92, 246, 0.85)',
+                        color: '#fff', border: '1px solid rgba(255,255,255,0.5)',
+                        padding: '10px 16px', borderRadius: '20px',
+                        fontSize: '13px', fontWeight: 'bold', cursor: 'pointer',
+                        backdropFilter: 'blur(6px)'
+                    }}
+                >
+                    📷 Scan QR Anchor
+                </button>
+            )}
+
+            {/* Diagnostic Panel for Defense / Viva */}
+            {arActive && (
+                <div style={{ position: 'absolute', top: isMobile ? '55px' : '90px', left: isMobile ? '8px' : '16px', background: 'rgba(0,0,0,0.7)', border: '1px solid #444', borderRadius: '8px', padding: isMobile ? '6px 8px' : '12px', color: '#fff', fontSize: isMobile ? '10px' : '12px', zIndex: 20, fontFamily: 'monospace', zoom: isMobile ? 0.85 : 1 }}>
+                    <div style={{ color: '#aaa', marginBottom: '4px', fontWeight: 'bold', textTransform: 'uppercase' }}>Diagnostics</div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '70px 1fr', gap: '3px' }}>
+                        <span style={{ color: '#888' }}>Error:</span>
+                        <span style={{ color: '#ef4444' }}>{debugInfo.error.toFixed(1)} m</span>
+                        <span style={{ color: '#888' }}>Deviation:</span>
+                        <span style={{ color: '#eab308' }}>{debugInfo.deviation.toFixed(1)} m</span>
+                        <span style={{ color: '#888' }}>Next Turn:</span>
+                        <span style={{ color: '#3b82f6' }}>{debugInfo.nextTurn}</span>
+                    </div>
+                </div>
+            )}
+
+            {/* Live Navigation State (Explainable AI / Navigation Layer) */}
+            {arActive && destId && waypoints.length > 0 && (
+                <div style={{ position: 'absolute', top: isMobile ? '130px' : '150px', left: isMobile ? '8px' : '16px', background: 'rgba(0,0,0,0.85)', border: '1px solid rgba(0, 255, 136, 0.4)', borderRadius: '10px', padding: isMobile ? '8px' : '12px', color: '#fff', fontSize: isMobile ? '11px' : '13px', zIndex: 20, fontFamily: 'Inter, sans-serif', boxShadow: '0 4px 15px rgba(0,0,0,0.6)', backdropFilter: 'blur(5px)', zoom: isMobile ? 0.85 : 1 }}>
+                    <div style={{ color: '#00ff88', marginBottom: '6px', fontWeight: 'bold', textTransform: 'uppercase', fontSize: isMobile ? '9px' : '11px', letterSpacing: '1px' }}>Navigation State</div>
+                    <div style={{ marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                        <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#00ff88', animation: 'pulse 1.5s infinite' }} />
+                        <span>Moving toward <strong>Node {waypoints.length > 1 ? waypoints.length - 1 : 'Destination'}</strong></span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', background: 'rgba(255,255,255,0.05)', padding: '4px 8px', borderRadius: '6px' }}>
+                        <span style={{ color: '#aaa', fontSize: isMobile ? '10px' : '12px' }}>Nodes Remaining:</span>
+                        <span style={{ fontWeight: 'bold', fontSize: isMobile ? '12px' : '14px', color: '#fff' }}>{waypoints.length}</span>
+                    </div>
+                </div>
+            )}
+
+            {/* ─── AI ASSISTANT PANEL (purely additive overlay) ─────────────────────
+                Wired to setDestId so the AI can update the navigation destination.
+                sensors + waypoints passed so voice guidance loop can read live state.
+                All existing AR logic above remains completely unchanged.            */}
             <AIAssistantPanel
-                onNavigate={onDestinationChange}
+                onNavigate={(id) => {
+                    setDestId(id);
+                    // STABILIZATION: Optional - trigger a reset when starting a new navigation if needed
+                }}
                 arActive={arActive}
                 sensors={sensors}
                 waypoints={waypoints}
             />
 
+            {/* Hybrid Vertical Localization (purely additive overlay) */}
             <FloorIndicator skipCalibration={!arActive} />
-
-            <CameraHintOverlay
-                videoRef={videoRef}
-                arActive={arActive}
-                confidence={confidence}
-            />
         </div>
     );
 };
