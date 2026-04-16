@@ -1,8 +1,9 @@
 import React, { useState, Suspense, lazy } from 'react';
 import { BottomNav, TabId } from './components/ui/BottomNav';
 import { RouteStep } from './components/ui/RouteCard';
+import { ErrorBoundary } from './components/ErrorBoundary';
 
-// Lazy load pages for performance
+// Lazy load components for performance
 const VoxelCampus = lazy(() => import('./pages/VoxelCampus').then(m => ({ default: m.VoxelCampus })));
 const RealMap = lazy(() => import('./pages/RealMap').then(m => ({ default: m.RealMap })));
 const GPSTab = lazy(() => import('./pages/GPSTab').then(m => ({ default: m.GPSTab })));
@@ -15,33 +16,53 @@ const App: React.FC = () => {
     const [selectedBuildingId, setSelectedBuildingId] = useState<string | null>(null);
     const [transportMode, setTransportMode] = useState<'walk' | 'cycle' | 'car'>('walk');
 
-    // Shared Navigation State
+    // Shared "Single Source of Truth" Navigation State
     const [activePath, setActivePath] = useState<string[]>([]);
     const [routeSteps, setRouteSteps] = useState<RouteStep[]>([]);
     const [destinationId, setDestinationId] = useState<string | null>(null);
 
+    // Callback stability for child component lifecycle
+    const handleDestinationUpdate = React.useCallback((id: string | null) => {
+        setDestinationId(id);
+        if (!id) {
+            setActivePath([]);
+            setRouteSteps([]);
+        }
+    }, [setDestinationId, setActivePath, setRouteSteps]);
+
+    const handleArStop = React.useCallback(() => {
+        setDestinationId(null);
+        setActivePath([]);
+        setRouteSteps([]);
+    }, [setDestinationId, setActivePath, setRouteSteps]);
+
     const renderTab = () => {
         switch (activeTab) {
-            case 'voxel': return <VoxelCampus selectedBuildingId={selectedBuildingId} onSelectBuilding={setSelectedBuildingId} transportMode={transportMode} onTransportModeChange={setTransportMode} />;
+            case 'voxel': return (
+                <ErrorBoundary fallbackTitle="Campus Voxel Error">
+                    <VoxelCampus 
+                        selectedBuildingId={selectedBuildingId} 
+                        onSelectBuilding={setSelectedBuildingId} 
+                        transportMode={transportMode} 
+                        onTransportModeChange={setTransportMode} 
+                    />
+                </ErrorBoundary>
+            );
             case 'map': return (
-                <RealMap 
-                    selectedBuildingId={selectedBuildingId} 
-                    onSelectBuilding={setSelectedBuildingId} 
-                    transportMode={transportMode}
-                    sharedPath={activePath}
-                    onPathUpdate={setActivePath}
-                    sharedSteps={routeSteps}
-                    onStepsUpdate={setRouteSteps}
-                    sharedDestinationId={destinationId}
-                    onDestinationUpdate={(id) => {
-                        setDestinationId(id);
-                        if (!id) {
-                            setActivePath([]);
-                            setRouteSteps([]);
-                        }
-                    }}
-                    onStartAR={() => setActiveTab('ar')}
-                />
+                <ErrorBoundary fallbackTitle="Map Engine Error">
+                    <RealMap 
+                        selectedBuildingId={selectedBuildingId} 
+                        onSelectBuilding={setSelectedBuildingId} 
+                        transportMode={transportMode}
+                        sharedPath={activePath}
+                        onPathUpdate={setActivePath}
+                        sharedSteps={routeSteps}
+                        onStepsUpdate={setRouteSteps}
+                        sharedDestinationId={destinationId}
+                        onDestinationUpdate={handleDestinationUpdate}
+                        onStartAR={() => setActiveTab('ar')}
+                    />
+                </ErrorBoundary>
             );
             case 'metrics': return (
                 <GPSTab 
@@ -53,19 +74,24 @@ const App: React.FC = () => {
             );
             case 'graph': return <PositioningPage />;
             case 'ar': return (
-                <ARPage 
-                    sharedPath={activePath} 
-                    sharedDestinationId={destinationId}
-                    onArStop={() => {
-                        setDestinationId(null);
-                        setActivePath([]);
-                        setRouteSteps([]);
-                    }}
-                    onDestinationChange={setDestinationId}
-                />
+                <ErrorBoundary fallbackTitle="AR Engine Error">
+                    <ARPage 
+                        sharedPath={activePath} 
+                        sharedDestinationId={destinationId}
+                        onArStop={handleArStop}
+                        onDestinationChange={setDestinationId}
+                    />
+                </ErrorBoundary>
             );
             case 'thesis': return <ThesisTab />;
-            default: return <VoxelCampus selectedBuildingId={selectedBuildingId} onSelectBuilding={setSelectedBuildingId} transportMode={transportMode} onTransportModeChange={setTransportMode} />;
+            default: return (
+                <VoxelCampus 
+                    selectedBuildingId={selectedBuildingId} 
+                    onSelectBuilding={setSelectedBuildingId} 
+                    transportMode={transportMode} 
+                    onTransportModeChange={setTransportMode} 
+                />
+            );
         }
     };
 
@@ -77,7 +103,7 @@ const App: React.FC = () => {
                         <div className="w-8 h-8 border-4 border-blue-500/20 border-t-blue-500 rounded-full animate-spin" />
                     </div>
                 }>
-                    <div key={activeTab} className="h-full w-full animate-fade-in">
+                    <div key={activeTab} className="h-full w-full animate-fade-in shadow-inner">
                         {renderTab()}
                     </div>
                 </Suspense>

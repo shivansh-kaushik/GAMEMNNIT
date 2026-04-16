@@ -61,3 +61,27 @@ export function isBrowserWifiScanAvailable(): boolean {
     // The Web API does NOT expose WiFi scanning for security reasons.
     return false;
 }
+
+/** Mock Reading for Native Bridge integration */
+export interface APReading {
+    ssid: string;
+    bssid: string;
+    rssi: number;
+    frequency?: number;
+    timestamp?: number;
+}
+
+/** 
+ * Returns latest native scan. 
+ * In pure web environment, it returns an empty array or a mock.
+ */
+export function getLatestNativeScan(): APReading[] {
+    // This is typically populated by the MNNIT Native Wrapper injection.
+    // If not injected, we return a mock of the ground floor.
+    return ACADEMIC_FLOOR_FINGERPRINTS[0].fingerprint.map(f => ({
+        ssid: f.ap,
+        bssid: '00:00:00:00:00:00',
+        rssi: f.rssi,
+        timestamp: Date.now()
+    }));
+}

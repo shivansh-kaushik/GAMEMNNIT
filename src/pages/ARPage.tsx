@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { CAMPUS_BUILDINGS } from '../navigation/buildings';
-import { readSensors, ARSensors } from '../ar/arEngine';
+import { readSensors, ARSensors, gpsToARWorld } from '../ar/arEngine';
 import { buildARPath, remainingDistance, ARNavWaypoint } from '../ar/arNavigation';
 import logger from '../utils/logger';
 import { AIAssistantPanel } from '../ai/AIAssistantPanel'; // AI layer — does not touch AR logic
@@ -10,6 +10,8 @@ import { MiniMapOverlay } from '../components/MiniMapOverlay';
 import { FloorIndicator } from '../components/FloorIndicator';
 import { calibrateFloor, useFloorDetection } from '../sensors/floorDetection';
 import { CameraHintOverlay } from '../ai/CameraHintOverlay';
+import { ARHud } from '../components/ui/ARHud';
+import { ARInstructionCard } from '../components/ui/ARInstructionCard';
 
 
 import { MapView } from '../components/MapView';
@@ -46,13 +48,15 @@ interface ARPageProps {
     sharedDestinationId: string | null;
     onArStop: () => void;
     onDestinationChange: (id: string | null) => void;
+    isActive?: boolean;
 }
 
 export const ARPage: React.FC<ARPageProps> = ({ 
     sharedPath, 
     sharedDestinationId, 
     onArStop,
-    onDestinationChange
+    onDestinationChange,
+    isActive = false
 }) => {
     const isMobile = window.innerWidth < 768;
     const videoRef = useRef<HTMLVideoElement>(null);
@@ -73,28 +77,6 @@ export const ARPage: React.FC<ARPageProps> = ({
     const [activeGraphPath, setActiveGraphPath] = useState<string[]>([]);
     const [pathMetrics, setPathMetrics] = useState({ length: 0, time: 0 });
     const graph = React.useMemo(() => buildGraphFromGeoJSON(pathData), []);
-
-    // 1. Consume Shared Path (Planning -> Execution)
-    useEffect(() => {
-        if (sharedPath.length === 0 || !sensors || !sensors.gpsLat || !sensors.gpsLon) return;
-
-        // Convert Node IDs to AR Waypoints (Map -> AR coordinate space transformation)
-        const pathWaypoints: ARNavWaypoint[] = sharedPath.map((id, i) => {
-            const node = graph.nodes[id];
-            if (!node) return null;
-            return {
-                ...gpsToARWorld(node.lat, node.lng, sensors.gpsLat!, sensors.gpsLon!),
-                gpsLat: node.lat,
-                gpsLon: node.lng,
-                distFromPrev: 0,
-                totalDist: 0,
-                label: i === sharedPath.length - 1 ? "Target" : undefined
-            };
-        }).filter(wp => wp !== null) as ARNavWaypoint[];
-
-        setWaypoints(pathWaypoints);
-        waypointsRef.current = pathWaypoints;
-    }, [sharedPath, sensors?.gpsLat, sensors?.gpsLon, graph]);
 
     // Smart features state
     const [debugInfo, setDebugInfo] = useState({ error: 0, deviation: 0, nextTurn: 'Straight' });
@@ -117,6 +99,53 @@ export const ARPage: React.FC<ARPageProps> = ({
     const pathDestRef = useRef<string | null>(null);
 
     useEffect(() => { destIdRef.current = destId; }, [destId]);
+
+    // 0. Sync Shared Destination (State Persistence)
+    useEffect(() => {
+        if (sharedDestinationId) {
+            setDestId(sharedDestinationId);
+        }
+    }, [sharedDestinationId]);
+
+    // 1. Consume Shared Path (Planning -> Execution)
+    useEffect(() => {
+        if (!sensors || !sensors.gpsLat || !sensors.gpsLon) return;
+
+        let activePath = sharedPath;
+        
+        // If QuickSelect was used, Map didn't generate a path. We generate fallback here:
+        if (activePath.length === 0 && destId) {
+            const destB = CAMPUS_BUILDINGS.find(b => b.id === destId);
+            if (destB) {
+                const [sx, sy, sz] = latLngToVoxel(sensors.gpsLat, sensors.gpsLon);
+                const [dx, dy, dz] = latLngToVoxel(destB.latitude, destB.longitude);
+                const sNode = findNearestGraphNode(sx, sz, graph.nodes);
+                const dNode = findNearestGraphNode(dx, dz, graph.nodes);
+                if (sNode && dNode) {
+                    activePath = aStar(sNode, dNode, graph.nodes, graph.edges);
+                }
+            }
+        }
+
+        if (activePath.length === 0) return;
+
+        // Convert Node IDs to AR Waypoints (Map -> AR coordinate space transformation)
+        const pathWaypoints: ARNavWaypoint[] = activePath.map((id, i) => {
+            const node = graph.nodes[id];
+            if (!node) return null;
+            return {
+                ...gpsToARWorld(node.lat, node.lng, sensors.gpsLat!, sensors.gpsLon!),
+                gpsLat: node.lat,
+                gpsLon: node.lng,
+                distFromPrev: 0,
+                totalDist: 0,
+                label: i === activePath.length - 1 ? "Target" : undefined
+            };
+        }).filter(wp => wp !== null) as ARNavWaypoint[];
+
+        setWaypoints(pathWaypoints);
+        waypointsRef.current = pathWaypoints;
+    }, [sharedPath, destId, sensors?.gpsLat, sensors?.gpsLon, graph]);
 
     const startLogging = () => { setIsLogging(true); isLoggingRef.current = true; };
     const stopLogging = () => { setIsLogging(false); isLoggingRef.current = false; };
@@ -151,6 +180,12 @@ export const ARPage: React.FC<ARPageProps> = ({
         setArActive(false);
         onArStop(); // Notify App to clear navigation intent on exit
     }, [onArStop]);
+
+    // 0. Camera Lifecycle
+    useEffect(() => {
+        startCamera();
+        return () => stopCamera();
+    }, [startCamera, stopCamera]);
 
     // ---------- Sensor polling ----------
     useEffect(() => {
@@ -455,6 +490,7 @@ export const ARPage: React.FC<ARPageProps> = ({
                 className="w-full h-full object-cover"
                 playsInline
                 muted
+                autoPlay
             />
             <canvas
                 ref={canvasRef}
@@ -486,11 +522,28 @@ export const ARPage: React.FC<ARPageProps> = ({
                 </div>
             )}
             
-            {!sharedDestinationId && (
-                <div className="absolute inset-0 flex items-center justify-center bg-black/60 backdrop-blur-md z-40 p-10 text-center">
-                    <div className="flex flex-col gap-4">
-                        <span className="text-white text-xl font-black italic uppercase tracking-tighter">Plan your journey on the map first</span>
-                        <div className="h-1 w-20 bg-blue-500 mx-auto" />
+            {!destId && (
+                <div className="absolute top-24 left-1/2 -translate-x-1/2 z-40 flex flex-col items-center gap-4 w-full px-6 pointer-events-auto">
+                    <div className="px-4 py-2 glass rounded-full border border-white/5 flex items-center gap-2 shadow-2xl">
+                        <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
+                        <span className="text-[10px] font-black uppercase tracking-widest text-white">Select Destination in AR</span>
+                    </div>
+
+                    <div className="flex gap-2 overflow-x-auto pb-2 w-full max-w-sm scrollbar-none justify-center">
+                        {[
+                            { id: 'mnnit_lib', name: 'Library', icon: '📚' },
+                            { id: 'mnnit_cse', name: 'CSE Bldg', icon: '💻' },
+                            { id: 'mnnit_admin', name: 'Admin', icon: '🏛️' }
+                        ].map(b => (
+                            <button
+                                key={b.id}
+                                onClick={() => onDestinationChange(b.id)}
+                                className="whitespace-nowrap flex items-center gap-2 px-4 py-2 bg-black/60 backdrop-blur-xl border border-white/10 rounded-2xl text-[11px] font-black uppercase tracking-tighter text-white hover:bg-blue-600 transition-all active:scale-95 shadow-lg"
+                            >
+                                <span>{b.icon}</span>
+                                <span>{b.name}</span>
+                            </button>
+                        ))}
                     </div>
                 </div>
             )}
@@ -508,7 +561,7 @@ export const ARPage: React.FC<ARPageProps> = ({
             <CameraHintOverlay
                 videoRef={videoRef}
                 arActive={arActive}
-                confidence={snapUI.confidence}
+                confidence={confidence}
             />
         </div>
     );

@@ -18,14 +18,14 @@ import { speak } from './voiceInput';
 function mapARToGraphNode(wp: ARNavWaypoint): GraphNode {
     return {
         id: wp.x + '_' + wp.z, 
-        lat: wp.lat || 0, // Fallback if lat not dynamically synced over
-        lon: wp.lon || 0,
-        type: wp.type as any,
+        lat: wp.gpsLat || 0, // Fallback if lat not dynamically synced over
+        lon: wp.gpsLon || 0,
+        type: (wp as any).type || 'road',
         label: wp.label
     };
 }
 
-export type GuidanceUpdateCallback = (text: string) => void;
+export type GuidanceUpdateCallback = (text: string, instruction: any) => void;
 
 interface GuidanceSession {
     stop: () => void;
@@ -60,9 +60,9 @@ export function startVoiceGuidance(
         // Convert world-space offsets back to GPS roughly (MNNIT local approximation used originally)
         const waypointsGPSMapped = waypoints.map(wp => ({
             id: String(wp.x) + '_' + String(wp.z),
-            lat: wp.lat || (lat + wp.z / 110540),
-            lon: wp.lon || (lon + wp.x / 111320),
-            type: wp.type as any,
+            lat: wp.gpsLat || (lat + wp.z / 110540),
+            lon: wp.gpsLon || (lon + wp.x / 111320),
+            type: (wp as any).type || 'road',
             label: wp.label
         }));
 
@@ -94,13 +94,13 @@ export function startVoiceGuidance(
             // Allow LLM override if configured/fast enough, else drop right to Speech
             // Using direct TTS for latency, background async for UI
             speak(instruction); 
-            onUpdate(instruction);
+            onUpdate(instruction, { action: 'continue', distance });
             
             // Asynchronously request LLM to flavor the UI output
             queryLLM([{ role: 'user', parts: [{ text: `Convert this navigation instruction into a short, friendly spoken direction: ${instruction}` }]}], 'You are a navigation assistant.')
             .then(res => {
                 if(res.ok && res.text.trim().length > 5) {
-                    onUpdate(res.text.trim());
+                    onUpdate(res.text.trim(), { action: 'continue', distance });
                 }
             }).catch(() => {});
         }

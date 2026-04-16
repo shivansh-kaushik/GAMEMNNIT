@@ -35,6 +35,7 @@ export const AIAssistantPanel: React.FC<AIAssistantPanelProps> = ({
     const [status, setStatus] = useState<PanelStatus>('idle');
     const [query, setQuery] = useState('');
     const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
+    const [errorMessage, setErrorMessage] = useState<string | null>(null);
     const [guidanceText, setGuidanceText] = useState('');
     const [expanded, setExpanded] = useState(false);
     const [activeDestId, setActiveDestId] = useState<string | null>(null);
@@ -111,6 +112,7 @@ export const AIAssistantPanel: React.FC<AIAssistantPanelProps> = ({
         if (!text.trim()) return;
         setQuery('');
         setStatus('thinking');
+        setErrorMessage(null);
 
         const newUserMsg: ChatMessage = { role: 'user', parts: [{ text }] };
         const updatedHistory = [...chatHistory, newUserMsg];
@@ -123,6 +125,7 @@ export const AIAssistantPanel: React.FC<AIAssistantPanelProps> = ({
         
         if (!llmResult.ok) {
            setStatus('error');
+           setErrorMessage(llmResult.error || 'Connection Failed');
            setChatHistory(prev => [...prev, { role: 'model', parts: [{ text: `⚠️ ${llmResult.error || 'Network error'}` }] }]);
            return;
         }
@@ -158,7 +161,7 @@ export const AIAssistantPanel: React.FC<AIAssistantPanelProps> = ({
         thinking: { color: 'text-blue-400', label: 'Thinking...', icon: true },
         guiding: { color: 'text-emerald-400', label: 'Navigating', icon: false },
         done: { color: 'text-purple-400', label: 'Arrived', icon: false },
-        error: { color: 'text-rose-500', label: 'Error', icon: false }
+        error: { color: 'text-rose-500', label: errorMessage || 'Error', icon: false }
     };
 
     return (

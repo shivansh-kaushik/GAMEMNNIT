@@ -2,7 +2,7 @@
 
 export interface GraphNode {
   id: string;
-  type?: 'junction' | 'stairs' | 'lift' | 'entrance' | 'road';
+  type?: 'junction' | 'stairs' | 'lift' | 'entrance' | 'road' | 'building';
   lat: number;
   lon: number;
   label?: string;

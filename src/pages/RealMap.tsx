@@ -29,6 +29,7 @@ interface RealMapProps {
     sharedDestinationId: string | null;
     onDestinationUpdate: (id: string | null) => void;
     onStartAR: () => void;
+    isActive?: boolean;
 }
 
 export const RealMap: React.FC<RealMapProps> = ({ 
@@ -41,7 +42,8 @@ export const RealMap: React.FC<RealMapProps> = ({
     onStepsUpdate,
     sharedDestinationId,
     onDestinationUpdate,
-    onStartAR 
+    onStartAR,
+    isActive = false
 }) => {
     // @ts-ignore
     const token = import.meta.env.VITE_MAPBOX_TOKEN;
@@ -106,10 +108,11 @@ export const RealMap: React.FC<RealMapProps> = ({
     const routeGeoJSON = useMemo(() => {
         if (sharedPath.length < 2) return null;
         return {
-            type: 'Feature',
+            type: 'Feature' as const,
+            properties: {}, // Required by some GeoJSON types
             geometry: {
-                type: 'LineString',
-                coordinates: sharedPath.map(id => [graph.nodes[id].lon, graph.nodes[id].lat])
+                type: 'LineString' as const,
+                coordinates: sharedPath.map(id => [graph.nodes[id].lng, graph.nodes[id].lat])
             }
         };
     }, [sharedPath, graph]);
