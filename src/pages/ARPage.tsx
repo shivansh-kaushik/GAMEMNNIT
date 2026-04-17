@@ -56,80 +56,77 @@ const AROverlayScene: React.FC<{ waypoints: ARNavWaypoint[], sensors: ARSensors,
     const arrowsRef = useRef<THREE.Group>(null);
 
     useFrame((state) => {
-        // Pulse animation for waypoint orbs
+        // Gentle pulse for next waypoint only
         const t = state.clock.getElapsedTime();
-        if (arrowsRef.current) {
-            arrowsRef.current.children.forEach((child, i) => {
-                child.scale.setScalar(1 + 0.08 * Math.sin(t * 2 + i * 0.5));
-            });
+        if (arrowsRef.current && arrowsRef.current.children.length > 0) {
+            arrowsRef.current.children[0].scale.setScalar(1 + 0.06 * Math.sin(t * 3));
         }
-        // Cone always points to next waypoint
+        // Arrow always points to next waypoint
         if (coneWrapperRef.current && waypoints.length > 0) {
             const nextWP = waypoints[Math.min(1, waypoints.length - 1)];
-            coneWrapperRef.current.lookAt(nextWP.x, -1.0, -nextWP.z);
+            coneWrapperRef.current.lookAt(nextWP.x, 0, -nextWP.z);
         }
     });
 
-    // Confidence Cone: spread grows with GPS error
-    const baseRadius = 0.3;
-    const dynamicSpread = Math.max(0.05, error * 0.4);
-    const coneOpacity = Math.max(0.15, 0.7 - error * 0.035);
+    // Confidence Cone: spread grows with GPS error — THESIS CORE
+    const dynamicSpread = Math.max(0.04, error * 0.25);
+    // Opacity kept low to avoid tinting the camera
+    const coneOpacity = Math.max(0.08, 0.25 - error * 0.01);
     const coneColor = confidence === 'Recalculating' ? '#ef4444' : confidence === 'Slightly Off' ? '#eab308' : '#00ff88';
 
     return (
         <>
             <DeviceOrientationControls />
-            <ambientLight intensity={0.6} />
-            <pointLight position={[0, 3, 0]} intensity={1.5} color="#ffffff" />
+            <ambientLight intensity={0.8} />
 
-            {/* Navigation waypoint orbs — user is always at origin (0,0,0) */}
+            {/* Waypoint marker orbs — only show next 4 */}
             <group ref={arrowsRef}>
-                {waypoints.slice(0, 6).map((wp, i) => {
-                    // Clamp to max 30m visual range so orbs are always visible on screen
-                    const maxRange = 30;
+                {waypoints.slice(0, 4).map((wp, i) => {
+                    const maxRange = 25;
                     const dist = Math.sqrt(wp.x * wp.x + wp.z * wp.z);
                     const scale_factor = dist > maxRange ? maxRange / dist : 1;
                     const px = wp.x * scale_factor;
                     const pz = wp.z * scale_factor;
-                    const radius = Math.max(0.15, 0.6 - i * 0.07);
+                    // Smaller orbs: next node is 0.12m radius, rest shrink
+                    const radius = Math.max(0.06, 0.14 - i * 0.025);
                     const isLast = i === waypoints.length - 1;
                     const color = isLast ? '#ef4444' : '#00ff88';
                     return (
-                        <mesh key={i} position={[px, -0.5 - i * 0.15, -pz]}>
-                            <sphereGeometry args={[radius, 20, 20]} />
+                        <mesh key={i} position={[px, -0.3, -pz]}>
+                            <sphereGeometry args={[radius, 16, 16]} />
                             <meshStandardMaterial
                                 color={color}
                                 emissive={color}
-                                emissiveIntensity={1.2}
+                                emissiveIntensity={1.5}
                                 transparent
-                                opacity={0.9 - i * 0.08}
+                                opacity={0.95 - i * 0.15}
                             />
                         </mesh>
                     );
                 })}
             </group>
 
-            {/* Floating navigation arrow cone — points to next waypoint */}
+            {/* Navigation Arrow — clean, small, crisp */}
             {waypoints.length > 0 && (
-                <group ref={coneWrapperRef} position={[0, 0, 0]}>
-                    {/* Arrow shaft */}
-                    <mesh rotation={[Math.PI / 2, 0, 0]} position={[0, 0, -1.5]}>
-                        <cylinderGeometry args={[0.02, 0.02, 1.5, 16]} />
+                <group ref={coneWrapperRef} position={[0, 0.1, 0]}>
+                    {/* Shaft — thin */}
+                    <mesh rotation={[Math.PI / 2, 0, 0]} position={[0, 0, -0.9]}>
+                        <cylinderGeometry args={[0.012, 0.012, 0.8, 12]} />
                         <meshBasicMaterial color={coneColor} />
                     </mesh>
-                    {/* Arrow tip */}
-                    <mesh rotation={[Math.PI / 2, 0, 0]} position={[0, 0, -2.4]}>
-                        <coneGeometry args={[0.1, 0.3, 16]} />
+                    {/* Arrowhead cone */}
+                    <mesh rotation={[Math.PI / 2, 0, 0]} position={[0, 0, -1.45]}>
+                        <coneGeometry args={[0.07, 0.2, 12]} />
                         <meshBasicMaterial color={coneColor} />
                     </mesh>
-                    {/* Confidence Cone glow (Uncertainty-Gated Perception) */}
-                    <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, -1]}>
-                        <coneGeometry args={[dynamicSpread, 2.0, 32, 1, true]} />
+                    {/* Confidence Cone glow — THESIS: low opacity, NormalBlending to avoid tint */}
+                    <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, -0.5]}>
+                        <coneGeometry args={[dynamicSpread, 1.2, 24, 1, true]} />
                         <meshBasicMaterial
                             color={coneColor}
                             transparent
                             opacity={coneOpacity}
-                            blending={THREE.AdditiveBlending}
+                            blending={THREE.NormalBlending}
                             depthWrite={false}
                             side={THREE.DoubleSide}
                         />
@@ -673,7 +670,7 @@ export const ARPage: React.FC<ARPageProps> = ({
                     onClick={() => setScanMode(true)}
                     style={{
                         position: 'absolute',
-                        bottom: '140px',
+                        bottom: '260px',
                         right: '12px',
                         zIndex: 30,
                         background: 'linear-gradient(135deg, #7c3aed, #4f46e5)',
