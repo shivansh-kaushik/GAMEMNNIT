@@ -673,7 +673,7 @@ export const ARPage: React.FC<ARPageProps> = ({
                     onClick={() => setScanMode(true)}
                     style={{
                         position: 'absolute',
-                        bottom: '80px',
+                        bottom: '140px',
                         right: '12px',
                         zIndex: 30,
                         background: 'linear-gradient(135deg, #7c3aed, #4f46e5)',
