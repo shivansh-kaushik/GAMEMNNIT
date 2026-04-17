@@ -211,8 +211,11 @@ export const ARPage: React.FC<ARPageProps> = ({
 
     const isLoggingRef = useRef(false);
     const waypointsRef = useRef<ARNavWaypoint[]>([]);
-    const prevSnapRef = useRef<SnappedLocation | null>(null);
+    const prevSnapRef = useRef<ReturnType<typeof advancedSnapToPath> | null>(null);
+    const lastGPSRef  = useRef<{ lat: number; lon: number } | null>(null);  // GPS throttle
     const [snapUI, setSnapUI] = useState<{isLocked: boolean, confidence: number}>({ isLocked: false, confidence: 0 });
+
+    const hasReliableNav = snapUI.isLocked && snapUI.confidence > 0.5;
 
     // Level 2: Ground Truth Tracking
     const [scanMode, setScanMode] = useState(false);
@@ -280,6 +283,15 @@ export const ARPage: React.FC<ARPageProps> = ({
             setSensors(s);
 
             if (waypointsRef.current.length > 0 && s.gpsLat && s.gpsLon) {
+
+                // ── GPS THROTTLE: skip recalculation if user hasn't moved >2m ──
+                let gpsChanged = true;
+                if (lastGPSRef.current) {
+                    const movedM = getDistanceM(lastGPSRef.current.lat, lastGPSRef.current.lon, s.gpsLat, s.gpsLon);
+                    if (movedM < 2) gpsChanged = false;
+                }
+                if (gpsChanged) lastGPSRef.current = { lat: s.gpsLat, lon: s.gpsLon };
+                if (!gpsChanged) return; // nothing meaningful has changed — skip the heavy work
                 const currentHeading = (s.compassBearing ?? 0) + headingOffset;
                 
                 // --- LEVEL 1.5: ADVANCED TEMPORAL PATH SNAPPING ---
@@ -624,26 +636,38 @@ export const ARPage: React.FC<ARPageProps> = ({
                 </div>
             )}
 
-            {/* Smart Navigation Overlays */}
-            {arActive && (
-                <div style={{ position: 'absolute', top: '25%', left: '50%', transform: 'translateX(-50%)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', zIndex: 11, zoom: isMobile ? 0.75 : 1 }}>
-                    {turnMessage && (
-                        <div style={{ background: 'rgba(59, 130, 246, 0.9)', color: '#fff', padding: isMobile ? '8px 16px' : '12px 24px', borderRadius: '30px', fontWeight: 'bold', fontSize: isMobile ? '14px' : '18px', boxShadow: '0 4px 15px rgba(0,0,0,0.5)', border: '2px solid rgba(255,255,255,0.7)' }}>
-                            {turnMessage}
-                        </div>
-                    )}
-                    {entranceWarning && (
-                        <div style={{ background: 'rgba(16, 185, 129, 0.9)', color: '#fff', padding: isMobile ? '6px 12px' : '10px 20px', borderRadius: '12px', fontWeight: 'bold', fontSize: isMobile ? '12px' : '16px', border: '2px solid rgba(255,255,255,0.5)' }}>
-                            {entranceWarning}
-                        </div>
-                    )}
-                    {pathWarning && (
-                        <div style={{ background: 'rgba(239, 68, 68, 0.9)', color: '#fff', padding: isMobile ? '6px 12px' : '10px 20px', borderRadius: '12px', fontWeight: 'bold', fontSize: isMobile ? '12px' : '16px', border: '2px solid rgba(255,255,255,0.5)', animation: 'pulse 1s infinite' }}>
-                            {pathWarning}
-                        </div>
-                    )}
-                </div>
-            )}
+            {/* Smart Navigation Overlays — STATE GATED: no contradictory messages */}
+            {arActive && (() => {
+                // Reliable navigation: path must be locked AND confidence >= 60%
+                const hasReliableNav = snapUI.isLocked && snapUI.confidence >= 0.6;
+                return (
+                    <div style={{ position: 'absolute', top: '25%', left: '50%', transform: 'translateX(-50%)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', zIndex: 11, zoom: isMobile ? 0.75 : 1 }}>
+                        {/* Turn arrow ONLY when path is reliably locked */}
+                        {turnMessage && hasReliableNav && (
+                            <div style={{ background: 'rgba(59, 130, 246, 0.9)', color: '#fff', padding: isMobile ? '8px 16px' : '12px 24px', borderRadius: '30px', fontWeight: 'bold', fontSize: isMobile ? '14px' : '18px', boxShadow: '0 4px 15px rgba(0,0,0,0.5)', border: '2px solid rgba(255,255,255,0.7)' }}>
+                                {turnMessage}
+                            </div>
+                        )}
+                        {/* Single honest status when not reliable */}
+                        {!hasReliableNav && waypointsRef.current.length > 0 && (
+                            <div style={{ background: 'rgba(245,158,11,0.92)', color: '#fff', padding: isMobile ? '8px 16px' : '12px 24px', borderRadius: '30px', fontWeight: 'bold', fontSize: isMobile ? '13px' : '15px', boxShadow: '0 4px 15px rgba(0,0,0,0.5)', border: '2px solid rgba(255,255,255,0.5)' }}>
+                                {snapUI.isLocked ? '📍 Improving GPS accuracy…' : '🔄 Reacquiring path…'}
+                            </div>
+                        )}
+                        {entranceWarning && hasReliableNav && (
+                            <div style={{ background: 'rgba(16, 185, 129, 0.9)', color: '#fff', padding: isMobile ? '6px 12px' : '10px 20px', borderRadius: '12px', fontWeight: 'bold', fontSize: isMobile ? '12px' : '16px', border: '2px solid rgba(255,255,255,0.5)' }}>
+                                {entranceWarning}
+                            </div>
+                        )}
+                        {/* Path warning only shown as the SINGLE message when path is lost */}
+                        {pathWarning && !snapUI.isLocked && (
+                            <div style={{ background: 'rgba(239, 68, 68, 0.9)', color: '#fff', padding: isMobile ? '6px 12px' : '10px 20px', borderRadius: '12px', fontWeight: 'bold', fontSize: isMobile ? '12px' : '16px', border: '2px solid rgba(255,255,255,0.5)', animation: 'pulse 1s infinite' }}>
+                                {pathWarning}
+                            </div>
+                        )}
+                    </div>
+                );
+            })()}
 
             {/* Live Location & Dev Debug */}
             {arActive && sensors && sensors.gpsLat !== null && (
