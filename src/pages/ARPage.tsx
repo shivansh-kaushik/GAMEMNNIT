@@ -215,7 +215,29 @@ export const ARPage: React.FC<ARPageProps> = ({
     const lastGPSRef  = useRef<{ lat: number; lon: number } | null>(null);  // GPS throttle
     const [snapUI, setSnapUI] = useState<{isLocked: boolean, confidence: number}>({ isLocked: false, confidence: 0 });
 
-    const hasReliableNav = snapUI.isLocked && snapUI.confidence > 0.5;
+    // ── RELIABILITY GATE with hysteresis (prevents banner flicker near threshold) ──
+    // Enter "reliable" only when conf ≥ 0.60, exit only when conf < 0.50
+    const GPS_GOOD_M      = 15;   // metres — treat GPS as reliable below this
+    const CONF_ENTER      = 0.60; // confidence to enter reliable state
+    const CONF_EXIT       = 0.50; // confidence to leave reliable state (hysteresis gap)
+    const isReliableRef   = useRef(false); // persists across renders without causing re-render
+    const [navReliable, setNavReliable] = useState(false); // drives the UI
+
+    // Recompute reliability whenever snapUI or gpsError changes
+    const gpsAccuracy = (sensors as any)?.gpsError ?? 999;
+    (() => {
+        const conf = snapUI.confidence;
+        const gpsGood = gpsAccuracy <= GPS_GOOD_M;
+        const prevReliable = isReliableRef.current;
+        let next = prevReliable;
+        if (!prevReliable && snapUI.isLocked && gpsGood && conf >= CONF_ENTER) next = true;
+        if (prevReliable  && (!snapUI.isLocked || !gpsGood || conf < CONF_EXIT)) next = false;
+        if (next !== prevReliable) {
+            isReliableRef.current = next;
+            setNavReliable(next);
+            console.log('[NAV_STATE]', { isLocked: snapUI.isLocked, confidence: conf.toFixed(2), gpsAccuracy: gpsAccuracy.toFixed(1) + 'm', reliable: next });
+        }
+    })();
 
     // Level 2: Ground Truth Tracking
     const [scanMode, setScanMode] = useState(false);
@@ -638,23 +660,21 @@ export const ARPage: React.FC<ARPageProps> = ({
 
             {/* Smart Navigation Overlays — STATE GATED: no contradictory messages */}
             {arActive && (() => {
-                // Reliable navigation: path must be locked AND confidence >= 60%
-                const hasReliableNav = snapUI.isLocked && snapUI.confidence >= 0.6;
                 return (
                     <div style={{ position: 'absolute', top: '25%', left: '50%', transform: 'translateX(-50%)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', zIndex: 11, zoom: isMobile ? 0.75 : 1 }}>
                         {/* Turn arrow ONLY when path is reliably locked */}
-                        {turnMessage && hasReliableNav && (
+                        {turnMessage && navReliable && (
                             <div style={{ background: 'rgba(59, 130, 246, 0.9)', color: '#fff', padding: isMobile ? '8px 16px' : '12px 24px', borderRadius: '30px', fontWeight: 'bold', fontSize: isMobile ? '14px' : '18px', boxShadow: '0 4px 15px rgba(0,0,0,0.5)', border: '2px solid rgba(255,255,255,0.7)' }}>
                                 {turnMessage}
                             </div>
                         )}
                         {/* Single honest status when not reliable */}
-                        {!hasReliableNav && waypointsRef.current.length > 0 && (
+                        {!navReliable && waypointsRef.current.length > 0 && (
                             <div style={{ background: 'rgba(245,158,11,0.92)', color: '#fff', padding: isMobile ? '8px 16px' : '12px 24px', borderRadius: '30px', fontWeight: 'bold', fontSize: isMobile ? '13px' : '15px', boxShadow: '0 4px 15px rgba(0,0,0,0.5)', border: '2px solid rgba(255,255,255,0.5)' }}>
                                 {snapUI.isLocked ? '📍 Improving GPS accuracy…' : '🔄 Reacquiring path…'}
                             </div>
                         )}
-                        {entranceWarning && hasReliableNav && (
+                        {entranceWarning && navReliable && (
                             <div style={{ background: 'rgba(16, 185, 129, 0.9)', color: '#fff', padding: isMobile ? '6px 12px' : '10px 20px', borderRadius: '12px', fontWeight: 'bold', fontSize: isMobile ? '12px' : '16px', border: '2px solid rgba(255,255,255,0.5)' }}>
                                 {entranceWarning}
                             </div>
