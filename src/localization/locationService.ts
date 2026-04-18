@@ -1,11 +1,18 @@
 import { CAMPUS_WIFI_APS } from '../data/wifiAPs';
 import { transformGPSToDigitalTwin, transformDigitalTwinToGPS } from '../core/coordinateTransform';
+import { KalmanGPS, KalmanState } from '../sensors/KalmanGPS';
 
 export interface LocationData {
     lat: number;
     lon: number;
     accuracy: number;
     timestamp?: number;
+    /** Kalman-estimated speed in m/s (0 when stationary) */
+    speed?: number;
+    /** GPS-derived movement bearing 0–360°, or -1 when stationary */
+    gpsBearing?: number;
+    /** Filter's own uncertainty estimate in metres */
+    estimatedAccuracy?: number;
 }
 
 export interface WifiRSSI {
@@ -18,36 +25,44 @@ export type LocationCallback = (location: LocationData) => void;
 class LocationService {
     private watchId: number | null = null;
     private callbacks: LocationCallback[] = [];
-    private lastGPS: LocationData | null = null;
+    private lastKalmanState: KalmanState | null = null;
+    private lastRawAccuracy: number = 999;
     private currentWifi: WifiRSSI[] = [];
     private updateInterval: any = null;
+    private kalman = new KalmanGPS();
 
     start(onUpdate: LocationCallback) {
         this.callbacks.push(onUpdate);
 
         if (this.callbacks.length === 1) {
-            if ("geolocation" in navigator) {
+            if ('geolocation' in navigator) {
                 this.watchId = navigator.geolocation.watchPosition(
                     (position) => {
-                        this.lastGPS = {
-                            lat: position.coords.latitude,
-                            lon: position.coords.longitude,
-                            accuracy: position.coords.accuracy,
-                            timestamp: position.timestamp
-                        };
+                        const { latitude, longitude, accuracy } = position.coords;
+
+                        // Pass raw GPS through Kalman filter
+                        const state = this.kalman.update(
+                            latitude,
+                            longitude,
+                            accuracy,
+                            position.timestamp
+                        );
+
+                        this.lastKalmanState = state;
+                        this.lastRawAccuracy = accuracy;
                     },
                     (error) => {
-                        console.error("GPS Error:", error);
+                        console.error('[LocationService] GPS Error:', error);
                     },
                     {
                         enableHighAccuracy: true,
-                        maximumAge: 2000,
-                        timeout: 5000
+                        maximumAge: 0,   // Kalman handles smoothing — let raw updates flow
+                        timeout: 10000,
                     }
                 );
             }
 
-            // Location updates should occur every 2 seconds.
+            // Fused location updates every 2 seconds
             this.updateInterval = setInterval(() => {
                 this.emitFusedLocation();
             }, 2000);
@@ -57,7 +72,7 @@ class LocationService {
     stop(onUpdate: LocationCallback) {
         this.callbacks = this.callbacks.filter(cb => cb !== onUpdate);
         if (this.callbacks.length === 0) {
-            if (this.watchId !== null && "geolocation" in navigator) {
+            if (this.watchId !== null && 'geolocation' in navigator) {
                 navigator.geolocation.clearWatch(this.watchId);
                 this.watchId = null;
             }
@@ -73,15 +88,14 @@ class LocationService {
     }
 
     private emitFusedLocation() {
-        if (!this.lastGPS) return;
+        if (!this.lastKalmanState) return;
 
-        let finalLat = this.lastGPS.lat;
-        let finalLon = this.lastGPS.lon;
+        let finalLat = this.lastKalmanState.lat;
+        let finalLon = this.lastKalmanState.lon;
 
-        // Wifi trilateration / weighted average fusion
+        // WiFi trilateration / weighted average fusion on top of Kalman output
         if (this.currentWifi && this.currentWifi.length > 0) {
             const n = 2.0;
-
             let sumWeight = 0;
             let sumX = 0;
             let sumZ = 0;
@@ -92,7 +106,6 @@ class LocationService {
                 if (ap) {
                     const distance = Math.pow(10, (ap.txPower - reading.rssi) / (10 * n));
                     const weight = 1 / (distance * distance + 0.1);
-
                     sumX += ap.x * weight;
                     sumZ += ap.z * weight;
                     sumWeight += weight;
@@ -103,10 +116,9 @@ class LocationService {
             if (validAPs > 0) {
                 const wifiX = sumX / sumWeight;
                 const wifiZ = sumZ / sumWeight;
-
                 const wifiGPS = transformDigitalTwinToGPS(wifiX, wifiZ);
 
-                // Simple Weighted average to fuse GPS & WiFi
+                // Weight GPS more heavily than WiFi (70/30)
                 finalLat = finalLat * 0.7 + wifiGPS.lat * 0.3;
                 finalLon = finalLon * 0.7 + wifiGPS.lon * 0.3;
             }
@@ -115,8 +127,11 @@ class LocationService {
         const location: LocationData = {
             lat: finalLat,
             lon: finalLon,
-            accuracy: this.lastGPS.accuracy,
-            timestamp: Date.now()
+            accuracy: this.lastRawAccuracy,
+            timestamp: Date.now(),
+            speed: this.lastKalmanState.speed,
+            gpsBearing: this.lastKalmanState.gpsBearing,
+            estimatedAccuracy: this.lastKalmanState.estimatedAccuracy,
         };
 
         this.callbacks.forEach(cb => cb(location));

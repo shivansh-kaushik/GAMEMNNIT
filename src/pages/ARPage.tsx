@@ -6,7 +6,8 @@ import * as THREE from 'three';
 import { CAMPUS_BUILDINGS } from '../navigation/buildings';
 import { readSensors, ARSensors, gpsToARWorld } from '../ar/arEngine';
 import { buildARPath, remainingDistance, ARNavWaypoint } from '../ar/arNavigation';
-import logger from '../utils/logger';
+import logger, { LogEntry } from '../utils/logger';
+import { EvaluationPanel } from '../components/EvaluationPanel';
 import { AIAssistantPanel } from '../ai/AIAssistantPanel'; // AI layer — does not touch AR logic
 import { useHeadingSmoothing } from '../hooks/useHeadingSmoothing';
 import { useNavigationConfidence } from '../hooks/useNavigationConfidence';
@@ -50,8 +51,21 @@ function getDistanceM(lat1: number, lon1: number, lat2: number, lon2: number) {
 /**
  * AROverlayScene — React Three Fiber 3D Visualization
  * Handles rendering of Path Waypoints and the dynamic Confidence Cone.
+ * The cone spread is grounded in the Kalman covariance eigenvalue:
+ *   dynamicSpread = k · √λ_max(P_pos)   k = 0.1 (AR world scale)
  */
-const AROverlayScene: React.FC<{ waypoints: ARNavWaypoint[], sensors: ARSensors, headingOffset: number, error: number, confidence: string }> = ({ waypoints, sensors, headingOffset, error, confidence }) => {
+const AROverlayScene: React.FC<{
+    waypoints: ARNavWaypoint[];
+    sensors: ARSensors;
+    headingOffset: number;
+    /**
+     * λ_max(P_pos) from the ENU Kalman filter in m².
+     * cone_spread = k · √covMaxEigenvalue, k = 0.1
+     * Replaces old non-physical 'error * 0.25' formula.
+     */
+    covMaxEigenvalue: number;
+    confidence: string;
+}> = ({ waypoints, sensors, headingOffset, covMaxEigenvalue, confidence }) => {
     const coneWrapperRef = useRef<THREE.Group>(null);
     const arrowsRef = useRef<THREE.Group>(null);
 
@@ -68,10 +82,22 @@ const AROverlayScene: React.FC<{ waypoints: ARNavWaypoint[], sensors: ARSensors,
         }
     });
 
-    // Confidence Cone: spread grows with GPS error — THESIS CORE
-    const dynamicSpread = Math.max(0.04, error * 0.25);
-    // Opacity kept low to avoid tinting the camera
-    const coneOpacity = Math.max(0.08, 0.25 - error * 0.01);
+    /**
+     * PhD CONFIDENCE CONE FORMULA
+     *   positionUncertainty = √λ_max(P_pos)  [metres]
+     *   cone_spread = k · positionUncertainty
+     *
+     * k = 0.1 maps 1 metre uncertainty to 0.1 AR world units.
+     * At typical outdoor GPS (σ ≈ 5m): spread = 0.5 (clearly visible)
+     * At excellent GPS (σ ≈ 1m): spread = 0.1 (tight, high confidence)
+     * At poor GPS (σ ≈ 20m): spread = 2.0 (wide warning cone)
+     */
+    const k = 0.1;
+    const positionUncertaintyM = Math.sqrt(Math.max(0, covMaxEigenvalue));
+    const dynamicSpread = Math.max(0.04, Math.min(2.0, k * positionUncertaintyM));
+
+    // Opacity: fades slightly as uncertainty grows (keeps visual clean)
+    const coneOpacity = Math.max(0.06, 0.25 - dynamicSpread * 0.05);
     const coneColor = confidence === 'Recalculating' ? '#ef4444' : confidence === 'Slightly Off' ? '#eab308' : '#00ff88';
 
     return (
@@ -248,7 +274,16 @@ export const ARPage: React.FC<ARPageProps> = ({
     const stopLogging = () => { setIsLogging(false); isLoggingRef.current = false; };
     const downloadLogs = () => logger.download();
 
-    const smoothedHeading = useHeadingSmoothing(sensors?.compassBearing ?? 0, 0.15, 150);
+    // GPS speed/bearing from Kalman state (stored on sensors by arEngine)
+    const kalmanSpeed    = (sensors as any)?.kalmanSpeed    ?? 0;
+    const kalmanGPSBearing = (sensors as any)?.kalmanGPSBearing ?? -1;
+    const smoothedHeading = useHeadingSmoothing(
+        sensors?.compassBearing ?? 0,
+        0.15,
+        150,
+        kalmanGPSBearing,
+        kalmanSpeed
+    );
     const confidence = useNavigationConfidence(sensors?.gpsLat ?? 0, sensors?.gpsLon ?? 0, destId);
 
     // Voice guidance integration
@@ -314,15 +349,19 @@ export const ARPage: React.FC<ARPageProps> = ({
                 }
                 if (gpsChanged) lastGPSRef.current = { lat: s.gpsLat, lon: s.gpsLon };
                 if (!gpsChanged) return; // nothing meaningful has changed — skip the heavy work
-                const currentHeading = (s.compassBearing ?? 0) + headingOffset;
-                
-                // --- LEVEL 1.5: ADVANCED TEMPORAL PATH SNAPPING ---
+                const currentHeading = ((s as any).compassBearing ?? 0) + headingOffset;
+                const sSpeed      = (s as any).kalmanSpeed      ?? 0;
+                const sGPSBearing = (s as any).kalmanGPSBearing ?? -1;
+
+                // --- LEVEL 1.5: ADVANCED TEMPORAL PATH SNAPPING (with GPS bearing fusion) ---
                 const snapped = advancedSnapToPath(
-                    s.gpsLat, s.gpsLon, 
-                    currentHeading, 
-                    waypointsRef.current, 
-                    gtAnchorUI.active ? null : prevSnapRef.current, // Wipe kalman filter if just anchored
-                    20
+                    s.gpsLat, s.gpsLon,
+                    currentHeading,
+                    waypointsRef.current,
+                    gtAnchorUI.active ? null : prevSnapRef.current,
+                    20,
+                    sGPSBearing,
+                    sSpeed
                 );
                 
                 prevSnapRef.current = snapped;
@@ -354,7 +393,8 @@ export const ARPage: React.FC<ARPageProps> = ({
                 setEntranceWarning(foundEnt ? `🚪 Entrance Ahead: ${foundEnt}` : null);
 
                 // 3. Orientation-based guidance & Debug Panel
-                const error = (s as any).gpsError || (4.0 + Math.random() * 2.0);
+                // Use real GPS accuracy — never synthesize with Math.random()
+                const error = (s as any).gpsError ?? (sensors as any)?.gpsAccuracy ?? 10;
 
                 const dLon = (nextWP.gpsLon - s.gpsLon) * Math.PI / 180;
                 const lat1 = s.gpsLat * Math.PI / 180;
@@ -379,16 +419,22 @@ export const ARPage: React.FC<ARPageProps> = ({
                 if (isLoggingRef.current) {
                     const finalWP = waypointsRef.current[waypointsRef.current.length - 1];
                     const distDest = getDistanceM(s.gpsLat, s.gpsLon, finalWP.gpsLat, finalWP.gpsLon);
-                    
-                    logger.add({
+
+                    const entry: LogEntry = {
                         time: Date.now(),
                         lat: s.gpsLat,
                         lon: s.gpsLon,
-                        error: error,
-                        deviation: deviation,
+                        rawAccuracy: (s as any).gpsAccuracy ?? undefined,
+                        estimatedAccuracy: (s as any).estimatedAccuracy ?? undefined,
+                        deviation,
+                        speed: (s as any).kalmanSpeed ?? undefined,
                         turn: turnLabel,
-                        distanceToTarget: distDest
-                    });
+                        distanceToTarget: distDest,
+                        pathLocked: snapped.isLocked,
+                        snapConfidence: snapped.confidence,
+                        covMaxEigenvalue: (s as any).covMaxEigenvalue ?? undefined,
+                    };
+                    logger.add(entry);
                 }
             }
         }, 1000);
@@ -510,7 +556,13 @@ export const ARPage: React.FC<ARPageProps> = ({
                                 scene.background = null;
                             }}
                         >
-                            <AROverlayScene waypoints={waypoints} sensors={sensors} headingOffset={headingOffset} error={debugInfo.error} confidence={confidence} />
+                            <AROverlayScene
+                                waypoints={waypoints}
+                                sensors={sensors}
+                                headingOffset={headingOffset}
+                                covMaxEigenvalue={(sensors as any)?.covMaxEigenvalue ?? 2500}
+                                confidence={confidence}
+                            />
                         </Canvas>
                     </div>
 
@@ -550,12 +602,6 @@ export const ARPage: React.FC<ARPageProps> = ({
                 ) : (
                     <>
                         <button onClick={stopCamera} style={btnStyle('#ef4444', '#fff')}>⏹ Stop</button>
-                        {!isLogging ? (
-                            <button onClick={startLogging} style={btnStyle('#3b82f6', '#fff')}>⚫ Start Log</button>
-                        ) : (
-                            <button onClick={stopLogging} style={btnStyle('#f59e0b', '#fff')}>🟠 Stop Log</button>
-                        )}
-                        {!isMobile && <button onClick={downloadLogs} style={btnStyle('#8b5cf6', '#fff')}>⬇ Download</button>}
                     </>
                 )}
             </div>
@@ -613,10 +659,20 @@ export const ARPage: React.FC<ARPageProps> = ({
                         </p>
                         <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
                             <button onClick={() => setPendingDestId(null)} style={btnStyle('#333', '#fff')}>Cancel</button>
-                            <button onClick={() => { 
-                                setDestId(pendingDestId); 
+                            <button onClick={() => {
+                                setDestId(pendingDestId);
                                 onDestinationChange(pendingDestId);
-                                setPendingDestId(null); 
+                                // Feed A* path to logger as ground truth reference
+                                // waypoints come from waypointsRef (built in the navigation useEffect)
+                                // We defer slightly to let the waypoints build first
+                                setTimeout(() => {
+                                    if (waypointsRef.current.length > 0) {
+                                        logger.setReferencePath(
+                                            waypointsRef.current.map(wp => ({ lat: wp.gpsLat, lon: wp.gpsLon }))
+                                        );
+                                    }
+                                }, 500);
+                                setPendingDestId(null);
                             }} style={btnStyle('#00ff88', '#000')}>Start AR Mode</button>
                         </div>
                     </div>
@@ -736,23 +792,59 @@ export const ARPage: React.FC<ARPageProps> = ({
                 </button>
             )}
 
-            {/* Diagnostic Panel for Defense / Viva */}
-            {arActive && (
-                <div style={{ position: 'absolute', top: isMobile ? '55px' : '90px', left: isMobile ? '8px' : '16px', background: 'rgba(0,0,0,0.7)', border: '1px solid #444', borderRadius: '8px', padding: isMobile ? '6px 8px' : '12px', color: '#fff', fontSize: isMobile ? '10px' : '12px', zIndex: 20, fontFamily: 'monospace', zoom: isMobile ? 0.85 : 1 }}>
+            {/* Diagnostic Panel — only shown when debugMode is ON */}
+            {arActive && debugMode && (
+                <div style={{ position: 'absolute', top: isMobile ? '55px' : '90px', left: isMobile ? '8px' : '16px', background: 'rgba(0,0,0,0.85)', border: '1px solid #444', borderRadius: '8px', padding: isMobile ? '6px 8px' : '12px', color: '#fff', fontSize: isMobile ? '10px' : '12px', zIndex: 20, fontFamily: 'monospace', zoom: isMobile ? 0.85 : 1 }}>
                     <div style={{ color: '#aaa', marginBottom: '4px', fontWeight: 'bold', textTransform: 'uppercase' }}>Diagnostics</div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '70px 1fr', gap: '3px' }}>
-                        <span style={{ color: '#888' }}>3D:</span>
-                        <span style={{ color: '#00ff88' }}>ACTIVE</span>
-                        <span style={{ color: '#888' }}>WP:</span>
+                    <div style={{ display: 'grid', gridTemplateColumns: '90px 1fr', gap: '3px' }}>
+                        <span style={{ color: '#888' }}>Waypoints:</span>
                         <span style={{ color: '#00ff88' }}>{waypoints.length}</span>
-                        <span style={{ color: '#888' }}>Error:</span>
+                        <span style={{ color: '#888' }}>GPS Acc:</span>
                         <span style={{ color: '#ef4444' }}>{debugInfo.error.toFixed(1)} m</span>
                         <span style={{ color: '#888' }}>Deviation:</span>
                         <span style={{ color: '#eab308' }}>{debugInfo.deviation.toFixed(1)} m</span>
+                        <span style={{ color: '#888' }}>Speed:</span>
+                        <span style={{ color: '#3b82f6' }}>{kalmanSpeed.toFixed(2)} m/s</span>
+                        <span style={{ color: '#888' }}>GPS Bearing:</span>
+                        <span style={{ color: '#3b82f6' }}>{kalmanGPSBearing >= 0 ? kalmanGPSBearing.toFixed(1)+'°' : 'still'}</span>
                         <span style={{ color: '#888' }}>Next Turn:</span>
                         <span style={{ color: '#3b82f6' }}>{debugInfo.nextTurn}</span>
                     </div>
                 </div>
+            )}
+
+            {/* ⚙ Debug toggle button — always visible when AR is active */}
+            {arActive && (
+                <button
+                    onClick={() => setDebugMode(d => !d)}
+                    style={{
+                        position: 'absolute',
+                        top: isMobile ? '55px' : '90px',
+                        left: isMobile ? '8px' : '16px',
+                        zIndex: debugMode ? 0 : 21, // behind panel when open, above all when closed
+                        background: debugMode ? 'transparent' : 'rgba(0,0,0,0.7)',
+                        border: debugMode ? 'none' : '1px solid #444',
+                        color: '#666',
+                        padding: '6px 8px',
+                        borderRadius: '8px',
+                        fontSize: '13px',
+                        cursor: 'pointer',
+                        display: debugMode ? 'none' : 'block',
+                    }}
+                    title="Toggle diagnostics"
+                >
+                    ⚙️
+                </button>
+            )}
+
+            {/* Evaluation Panel — replaces top-bar log buttons */}
+            {arActive && (
+                <EvaluationPanel
+                    isLogging={isLogging}
+                    onStartLog={startLogging}
+                    onStopLog={stopLogging}
+                    isMobile={isMobile}
+                />
             )}
 
             {/* Live Navigation State (Explainable AI / Navigation Layer) */}
